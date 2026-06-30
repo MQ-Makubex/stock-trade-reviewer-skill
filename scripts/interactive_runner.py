@@ -143,11 +143,11 @@ def load_privacy_summary(path):
     errors = data.get("errors", [])
     warnings = data.get("warnings", [])
     if errors:
-        kinds = sorted({item.get("type", "unknown") for item in errors})
+        kinds = sorted({item.get("risk_type", "unknown") for item in errors})
         return "失败", [f"发现 {len(errors)} 个隐私风险类型：{', '.join(kinds)}。", "为避免泄露，页面不显示原始单元格内容。"]
     if warnings:
-        kinds = sorted({item.get("type", "unknown") for item in warnings})
-        return "通过但有警告", [f"发现 {len(warnings)} 个警告类型：{', '.join(kinds)}。"]
+        kinds = sorted({item.get("risk_type", "unknown") for item in warnings})
+        return "通过但有警告", [f"发现非阻断隐私警告 {len(warnings)} 个：{', '.join(kinds)}。"]
     return "通过", ["未发现身份、账号、手机号、银行卡或地址类敏感信息。"]
 
 

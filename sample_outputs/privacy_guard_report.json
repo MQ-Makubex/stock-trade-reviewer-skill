@@ -5,5 +5,5 @@
   "row_count": 15,
   "checked_file": "sanitized_trades.csv",
   "strict_balance": false,
-  "note": "报告只记录风险类型和位置，不记录原始单元格内容。"
+  "note": "报告只记录风险类型、位置、原因和处理动作，不记录原始单元格内容。"
 }
