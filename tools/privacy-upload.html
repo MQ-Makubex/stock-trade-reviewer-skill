@@ -30,17 +30,17 @@
 <main>
   <header>
     <h1>隐私交互模式</h1>
-    <p class="muted">上传股票交割单 PDF 后，本地脚本会在本机脱敏、检查隐私并生成复盘报告。</p>
+    <p class="muted">上传一个或多个股票交割单 PDF 后，本地脚本会在本机脱敏、合并去重、检查隐私并生成复盘报告。每个文件只使用内部编号处理，不记录原始文件名。</p>
   </header>
 
-  <p class="alert">这是本地处理页面，只监听 127.0.0.1，不上传服务器，不联网。原始 PDF 只临时保存在系统临时目录，脱敏后立即删除。Codex 不读取、不打印、不分析原始 PDF 内容。</p>
+  <p class="alert">这是本地处理页面，只监听 127.0.0.1，不上传服务器，不联网。原始 PDF 只临时保存在系统临时目录，脱敏后立即删除。Codex 不读取、不打印、不分析原始 PDF 内容，也不读取原始文件名。</p>
 
   <section class="panel">
     <h2>上传 PDF</h2>
     <form id="uploadForm" enctype="multipart/form-data">
       <div class="drop">
-        <p>请选择券商交割单 PDF。请先确认文件中没有不必要的姓名、身份证、手机号、资金账号、银行卡号等信息。</p>
-        <input id="pdfInput" name="pdf" type="file" accept="application/pdf,.pdf" required>
+        <p>请选择一个或多个券商交割单 PDF。请先确认文件中没有不必要的姓名、身份证、手机号、资金账号、银行卡号等信息。</p>
+        <input id="pdfInput" name="pdf" type="file" accept="application/pdf,.pdf" multiple required>
         <br>
         <button id="submitButton" type="submit">开始本地处理</button>
       </div>
@@ -55,7 +55,7 @@
 
   <section class="panel">
     <h2>字段说明</h2>
-    <p class="muted">脱敏 CSV 只保留交易复盘所需字段，例如发生日期、买卖方向、证券代码、证券名称、成交数量、成交价格、净发生金额和费用字段。资金余额默认不保留。</p>
+    <p class="muted">脱敏 CSV 只保留交易复盘所需字段，例如发生日期、买卖方向、证券代码、证券名称、成交数量、成交价格、净发生金额和费用字段。资金余额默认不保留。多个文件会合并为 sanitized_trades_all.csv，并按交易关键字段去重生成 sanitized_trades_deduped.csv。</p>
   </section>
 </main>
 <script>
@@ -73,28 +73,31 @@
     const lines = data.messages || [];
     const details = data.paths || {};
     const reportLink = data.report_url ? `<p><a class="button" href="${escapeText(data.report_url)}" target="_blank" rel="noopener">打开 HTML 报告</a></p>` : "";
+    const stableLink = data.stable_report_url ? `<p><a class="button" href="${escapeText(data.stable_report_url)}" target="_blank" rel="noopener">打开稳定入口</a></p>` : "";
     resultEl.innerHTML = `
       <p class="${cls}"><strong>${escapeText(data.title || data.status)}</strong></p>
       <pre>${escapeText(lines.join("\\n"))}</pre>
       <dl>
         <dt>隐私检查</dt><dd>${escapeText(data.privacy_status || "未完成")}</dd>
-        <dt>脱敏 CSV</dt><dd><code>${escapeText(details.sanitized_trades || "")}</code></dd>
+        <dt>去重脱敏 CSV</dt><dd><code>${escapeText(details.sanitized_trades || "")}</code></dd>
+        <dt>合并报告</dt><dd><code>${escapeText(details.merge_report || "")}</code></dd>
         <dt>报告相对路径</dt><dd><code>${escapeText(details.html_report_relative || "")}</code></dd>
         <dt>HTML 报告</dt><dd><code>${escapeText(details.html_report || "")}</code></dd>
       </dl>
       ${reportLink}
+      ${stableLink}
     `;
   }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const file = document.getElementById("pdfInput").files[0];
-    if (!file) return;
+    const files = Array.from(document.getElementById("pdfInput").files);
+    if (!files.length) return;
     button.disabled = true;
     statusEl.textContent = "正在本机处理，请不要关闭此页面。";
     resultEl.innerHTML = "";
     const body = new FormData();
-    body.append("pdf", file);
+    files.forEach(file => body.append("pdf", file));
     try {
       const response = await fetch("/upload", { method: "POST", body });
       const data = await response.json();

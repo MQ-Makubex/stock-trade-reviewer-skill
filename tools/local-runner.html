@@ -30,7 +30,7 @@
 <main>
   <section class="hero">
     <h1>股票交割单本地复盘操作向导</h1>
-    <p class="muted">这是一个静态 HTML 向导，只帮你复制本机终端命令；它不读取本地文件、不上传数据、不需要后端服务、不需要联网。</p>
+    <p class="muted">这是一个静态 HTML 向导，只帮你复制本机终端命令；它不读取本地文件、不上传数据、不需要后端服务、不需要联网。默认在 Codex 中说“请使用 $stock-trade-reviewer”即可打开隐私上传页。</p>
   </section>
 
   <p class="alert">真实 PDF 不要上传到 AI。对真实文件只在本机终端运行脚本，并先删除姓名、身份证、手机号、资金账号、银行卡号、客户号、股东账号、营业部和地址。</p>
@@ -39,7 +39,7 @@
     <h2>完整流程</h2>
     <div class="step">
       <div class="row"><h3>0. 推荐：启动隐私交互模式</h3><button data-copy="python3 scripts/interactive_runner.py --open">复制命令</button></div>
-      <p class="muted">启动后访问 http://127.0.0.1:8787，在浏览器上传 PDF。原始 PDF 只进系统临时目录，脱敏后删除；真实输出写入 local_outputs/。</p>
+      <p class="muted">启动后访问 http://127.0.0.1:8787，在浏览器上传一个或多个 PDF。原始 PDF 只进系统临时目录，脱敏后删除；多文件会合并去重，真实输出写入 local_outputs/。</p>
       <pre>python3 scripts/interactive_runner.py --open</pre>
     </div>
     <div class="step">
@@ -103,6 +103,8 @@ python3 scripts/generate_html_report.py</pre>
     <details><summary>为什么不保留资金余额？</summary><p>资金余额可能暴露账户规模。默认删除；如果确实需要，请使用 <code>--keep-balance</code> 并运行隐私检查。</p></details>
     <details><summary>报告能不能作为买卖建议？</summary><p>不能。报告只做历史复盘，不荐股、不预测涨跌、不提供买卖建议。</p></details>
     <details><summary>隐私交互模式会把 PDF 放在哪里？</summary><p>原始 PDF 只放在 Python 的系统临时目录中，脱敏后立即删除；项目目录只保留 local_outputs/ 中的脱敏结果和报告。</p></details>
+    <details><summary>可以一次上传多个 PDF 吗？</summary><p>可以。交互模式会把每个文件按内部编号处理，合并为 <code>sanitized_trades_all.csv</code>，再按日期、方向、代码、名称、数量、价格和净发生金额去重为 <code>sanitized_trades_deduped.csv</code>，后续复盘基于去重结果。</p></details>
+    <details><summary>报告在哪里打开？</summary><p>每次运行会生成 <code>local_outputs/run_时间戳/trade_review_report.html</code>；同时复制一份到 <code>local_outputs/trade_review_report.html</code> 作为稳定入口。</p></details>
   </section>
 </main>
 <script>

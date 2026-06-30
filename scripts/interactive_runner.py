@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import argparse
+import csv
 import json
 import mimetypes
-import os
 import posixpath
 import shutil
 import subprocess
@@ -25,17 +25,34 @@ TOOLS_DIR = PROJECT_DIR / "tools"
 DEFAULT_OUTPUT_DIR = PROJECT_DIR / "local_outputs"
 BUNDLED_PYTHON = Path.home() / ".cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3"
 
-
 ALLOWED_CODEX_READ_FILES = [
     "sanitized_trades.csv",
+    "sanitized_trades_all.csv",
+    "sanitized_trades_deduped.csv",
     "privacy_guard_report.json",
     "cleaned_trades.csv",
     "metrics.json",
     "trade_lifecycle.json",
     "behavior_flags.json",
     "counterfactual_report.json",
+    "merge_report.json",
     "trade_review_report.html",
 ]
+
+SANITIZED_FIELDS = [
+    "trade_date",
+    "side",
+    "stock_code",
+    "stock_name",
+    "quantity",
+    "price",
+    "net_amount",
+    "commission",
+    "stamp_tax",
+    "transfer_fee",
+]
+
+DEDUPE_KEY = ["trade_date", "side", "stock_code", "stock_name", "quantity", "price", "net_amount"]
 
 
 class ProcessingError(Exception):
@@ -112,13 +129,15 @@ def run_command(args, cwd=PROJECT_DIR):
     return result
 
 
-def parse_multipart_pdf(body, content_type):
+def parse_multipart_pdfs(body, content_type):
     marker = "boundary="
     if marker not in content_type:
         raise ProcessingError("上传格式错误", ["请求不是 multipart/form-data。"])
     boundary = content_type.split(marker, 1)[1].split(";", 1)[0].strip().strip('"')
     if not boundary:
         raise ProcessingError("上传格式错误", ["缺少 multipart boundary。"])
+
+    uploads = []
     delimiter = ("--" + boundary).encode("utf-8")
     for part in body.split(delimiter):
         part = part.strip()
@@ -134,12 +153,16 @@ def parse_multipart_pdf(body, content_type):
             continue
         if payload.endswith(b"\r\n"):
             payload = payload[:-2]
+        file_id = f"file_{len(uploads) + 1:03d}"
         if not payload:
-            raise ProcessingError("上传文件为空", ["请选择一个 PDF 文件。"])
-        if not payload.startswith(b"%PDF"):
-            raise ProcessingError("文件类型错误", ["上传文件不像 PDF。请确认选择的是券商交割单 PDF。"])
-        return payload
-    raise ProcessingError("未找到 PDF", ["表单中没有名为 pdf 的文件字段。"])
+            uploads.append({"file_id": file_id, "error": "上传文件为空。"})
+        elif not payload.startswith(b"%PDF"):
+            uploads.append({"file_id": file_id, "error": "上传文件不像 PDF。"})
+        else:
+            uploads.append({"file_id": file_id, "content": payload})
+    if not uploads:
+        raise ProcessingError("未找到 PDF", ["表单中没有名为 pdf 的文件字段。"])
+    return uploads
 
 
 def load_privacy_summary(path):
@@ -158,70 +181,170 @@ def load_privacy_summary(path):
     return "通过", ["未发现身份、账号、手机号、银行卡或地址类敏感信息。"]
 
 
-def process_pdf(pdf_bytes, output_dir):
-    base_output_dir = safe_output_dir(output_dir)
-    run_name, run_dir = make_run_dir(base_output_dir)
+def read_csv_rows(path):
+    with open(path, newline="", encoding="utf-8") as fh:
+        return list(csv.DictReader(fh))
+
+
+def write_csv_rows(path, rows, fieldnames=SANITIZED_FIELDS):
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in fieldnames})
+
+
+def merge_successful_sanitized(files, all_path, deduped_path):
+    rows = []
+    for item in files:
+        if item.get("status") != "ok":
+            continue
+        rows.extend(read_csv_rows(item["sanitized_path"]))
+    write_csv_rows(all_path, rows)
+    seen = set()
+    deduped = []
+    for row in rows:
+        key = tuple((row.get(field, "") or "").strip() for field in DEDUPE_KEY)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(row)
+    write_csv_rows(deduped_path, deduped)
+    return rows, deduped
+
+
+def process_one_pdf(upload, tmpdir, run_dir):
+    file_id = upload["file_id"]
+    if upload.get("error"):
+        return {"file_id": file_id, "status": "failed", "reason": upload["error"]}
+
     temp_pdf_deleted = False
-    messages = ["原始 PDF 已保存到系统临时目录。"]
-    with tempfile.TemporaryDirectory(prefix="stock_trade_pdf_") as tmpdir:
-        tmp_path = Path(tmpdir) / f"upload-{uuid.uuid4().hex}.pdf"
-        tmp_path.write_bytes(pdf_bytes)
-        if not is_relative_to(tmp_path, tempfile.gettempdir()):
-            raise ProcessingError("临时目录异常", ["原始 PDF 未写入系统临时目录，已停止处理。"], status_code=500)
+    tmp_path = Path(tmpdir) / f"{file_id}.pdf"
+    tmp_path.write_bytes(upload["content"])
+    if not is_relative_to(tmp_path, tempfile.gettempdir()):
+        raise ProcessingError("临时目录异常", ["原始 PDF 未写入系统临时目录，已停止处理。"], status_code=500)
 
-        sanitized = run_dir / "sanitized_trades.csv"
-        sanitize_report = run_dir / "sanitize_pdf_report.json"
-        privacy_report = run_dir / "privacy_guard_report.json"
-        cleaned = run_dir / "cleaned_trades.csv"
-        metrics = run_dir / "metrics.json"
-        lifecycle = run_dir / "trade_lifecycle.json"
-        behavior = run_dir / "behavior_flags.json"
-        counterfactual = run_dir / "counterfactual_report.json"
-        markdown = run_dir / "trade_review_report.md"
-        html_report = run_dir / "trade_review_report.html"
-        mapping = run_dir / "field_mapping_suggestions.json"
+    sanitized = run_dir / f"{file_id}_sanitized.csv"
+    sanitize_report = run_dir / f"{file_id}_sanitize_pdf_report.json"
+    privacy_report = run_dir / f"{file_id}_privacy_guard_report.json"
 
-        try:
-            run_command([
-                PYTHON, str(SCRIPT_DIR / "sanitize_pdf_statement.py"),
-                str(tmp_path), "-o", str(sanitized), "--report", str(sanitize_report),
-            ])
-        except subprocess.CalledProcessError:
-            if tmp_path.exists():
-                tmp_path.unlink()
-                temp_pdf_deleted = True
-            raise ProcessingError("PDF 脱敏失败", ["可能是扫描版 PDF，或表格字段无法识别。请使用本地 OCR 或检查 PDF 格式。"])
-
+    try:
+        run_command([
+            PYTHON, str(SCRIPT_DIR / "sanitize_pdf_statement.py"),
+            str(tmp_path), "-o", str(sanitized), "--report", str(sanitize_report),
+        ])
+    except subprocess.CalledProcessError:
         if tmp_path.exists():
             tmp_path.unlink()
             temp_pdf_deleted = True
-        messages.append("原始 PDF 已在脱敏后删除。")
+        return {"file_id": file_id, "status": "failed", "reason": "PDF 脱敏失败，可能是扫描版 PDF 或字段无法识别。"}
 
-        try:
-            run_command([PYTHON, str(SCRIPT_DIR / "privacy_guard.py"), str(sanitized), "-o", str(privacy_report)])
-        except subprocess.CalledProcessError:
-            privacy_status, privacy_messages = load_privacy_summary(privacy_report)
-            raise ProcessingError("隐私检查失败", privacy_messages + ["已停止后续复盘流程。"], privacy_status=privacy_status)
+    if tmp_path.exists():
+        tmp_path.unlink()
+        temp_pdf_deleted = True
 
+    try:
+        run_command([PYTHON, str(SCRIPT_DIR / "privacy_guard.py"), str(sanitized), "-o", str(privacy_report)])
+    except subprocess.CalledProcessError:
         privacy_status, privacy_messages = load_privacy_summary(privacy_report)
-        messages.extend(privacy_messages)
+        return {
+            "file_id": file_id,
+            "status": "failed",
+            "reason": "隐私检查失败。",
+            "privacy_status": privacy_status,
+            "messages": privacy_messages,
+            "temp_pdf_deleted": temp_pdf_deleted,
+        }
 
-        steps = [
-            [PYTHON, str(SCRIPT_DIR / "parse_statement.py"), str(sanitized), "-o", str(cleaned), "--suggestions-out", str(mapping)],
-            [PYTHON, str(SCRIPT_DIR / "compute_metrics.py"), str(cleaned), "-o", str(metrics)],
-            [PYTHON, str(SCRIPT_DIR / "build_trade_lifecycle.py"), str(cleaned), "-o", str(lifecycle)],
-            [PYTHON, str(SCRIPT_DIR / "detect_behavior_patterns.py"), str(cleaned), str(metrics), str(lifecycle), "-o", str(behavior)],
-            [PYTHON, str(SCRIPT_DIR / "counterfactual_simulator.py"), str(metrics), str(lifecycle), "-o", str(counterfactual)],
-            [PYTHON, str(SCRIPT_DIR / "generate_review_report.py"), str(cleaned), str(metrics), str(lifecycle), str(behavior), str(counterfactual), "-o", str(markdown)],
-            [PYTHON, str(SCRIPT_DIR / "generate_html_report.py"), str(metrics), str(lifecycle), str(behavior), str(counterfactual), "--markdown", str(markdown), "-o", str(html_report)],
-        ]
-        try:
-            for step in steps:
-                run_command(step)
-        except subprocess.CalledProcessError:
-            raise ProcessingError("复盘流程失败", ["脱敏和隐私检查已完成，但后续指标或报告生成失败。"], privacy_status=privacy_status, status_code=500)
+    privacy_status, privacy_messages = load_privacy_summary(privacy_report)
+    return {
+        "file_id": file_id,
+        "status": "ok",
+        "privacy_status": privacy_status,
+        "messages": privacy_messages,
+        "sanitized_path": str(sanitized),
+        "privacy_report_path": str(privacy_report),
+        "temp_pdf_deleted": temp_pdf_deleted,
+    }
 
-    messages.append(f"临时 PDF 删除状态：{'已删除' if temp_pdf_deleted else '无需删除'}。")
+
+def process_pdfs(uploads, output_dir):
+    base_output_dir = safe_output_dir(output_dir)
+    run_name, run_dir = make_run_dir(base_output_dir)
+    file_results = []
+    messages = [f"收到 {len(uploads)} 个上传文件，使用内部编号 file_001 起处理。"]
+
+    with tempfile.TemporaryDirectory(prefix="stock_trade_pdf_") as tmpdir:
+        for upload in uploads:
+            file_results.append(process_one_pdf(upload, tmpdir, run_dir))
+
+    success_count = sum(1 for item in file_results if item.get("status") == "ok")
+    failure_count = len(file_results) - success_count
+    if success_count == 0:
+        merge_report = {
+            "uploaded_files": len(uploads),
+            "success_count": 0,
+            "failure_count": failure_count,
+            "rows_before_dedupe": 0,
+            "rows_after_dedupe": 0,
+            "duplicate_rows_removed": 0,
+            "file_results": [{k: v for k, v in item.items() if k not in {"sanitized_path", "privacy_report_path"}} for item in file_results],
+            "note": "不记录原始文件名。",
+        }
+        (run_dir / "merge_report.json").write_text(json.dumps(merge_report, ensure_ascii=False, indent=2), encoding="utf-8")
+        raise ProcessingError("全部文件处理失败", ["所有上传文件均未通过脱敏或隐私检查。", "页面不显示原始文件名或 PDF 内容。"])
+
+    all_sanitized = run_dir / "sanitized_trades_all.csv"
+    deduped_sanitized = run_dir / "sanitized_trades_deduped.csv"
+    all_rows, deduped_rows = merge_successful_sanitized(file_results, all_sanitized, deduped_sanitized)
+    merge_report = {
+        "uploaded_files": len(uploads),
+        "success_count": success_count,
+        "failure_count": failure_count,
+        "rows_before_dedupe": len(all_rows),
+        "rows_after_dedupe": len(deduped_rows),
+        "duplicate_rows_removed": len(all_rows) - len(deduped_rows),
+        "file_results": [{k: v for k, v in item.items() if k not in {"sanitized_path", "privacy_report_path"}} for item in file_results],
+        "note": "不记录原始文件名；每个文件仅使用内部编号。",
+    }
+    merge_report_path = run_dir / "merge_report.json"
+    merge_report_path.write_text(json.dumps(merge_report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    privacy_report = run_dir / "privacy_guard_report.json"
+    run_command([PYTHON, str(SCRIPT_DIR / "privacy_guard.py"), str(deduped_sanitized), "-o", str(privacy_report)])
+    privacy_status, privacy_messages = load_privacy_summary(privacy_report)
+
+    cleaned = run_dir / "cleaned_trades.csv"
+    metrics = run_dir / "metrics.json"
+    lifecycle = run_dir / "trade_lifecycle.json"
+    behavior = run_dir / "behavior_flags.json"
+    counterfactual = run_dir / "counterfactual_report.json"
+    markdown = run_dir / "trade_review_report.md"
+    html_report = run_dir / "trade_review_report.html"
+    stable_html = base_output_dir / "trade_review_report.html"
+    mapping = run_dir / "field_mapping_suggestions.json"
+
+    steps = [
+        [PYTHON, str(SCRIPT_DIR / "parse_statement.py"), str(deduped_sanitized), "-o", str(cleaned), "--suggestions-out", str(mapping)],
+        [PYTHON, str(SCRIPT_DIR / "compute_metrics.py"), str(cleaned), "-o", str(metrics)],
+        [PYTHON, str(SCRIPT_DIR / "build_trade_lifecycle.py"), str(cleaned), "-o", str(lifecycle)],
+        [PYTHON, str(SCRIPT_DIR / "detect_behavior_patterns.py"), str(cleaned), str(metrics), str(lifecycle), "-o", str(behavior)],
+        [PYTHON, str(SCRIPT_DIR / "counterfactual_simulator.py"), str(metrics), str(lifecycle), "-o", str(counterfactual)],
+        [PYTHON, str(SCRIPT_DIR / "generate_review_report.py"), str(cleaned), str(metrics), str(lifecycle), str(behavior), str(counterfactual), "-o", str(markdown)],
+        [PYTHON, str(SCRIPT_DIR / "generate_html_report.py"), str(metrics), str(lifecycle), str(behavior), str(counterfactual), "--markdown", str(markdown), "--merge-report", str(merge_report_path), "-o", str(html_report)],
+    ]
+    try:
+        for step in steps:
+            run_command(step)
+    except subprocess.CalledProcessError:
+        raise ProcessingError("复盘流程失败", ["脱敏、合并和隐私检查已完成，但后续指标或报告生成失败。"], privacy_status=privacy_status, status_code=500)
+
+    shutil.copy2(html_report, stable_html)
+    messages.extend(privacy_messages)
+    messages.append(f"上传文件数：{len(uploads)}，成功：{success_count}，失败：{failure_count}。")
+    messages.append(f"去重前行数：{len(all_rows)}，去重后行数：{len(deduped_rows)}，删除重复行：{len(all_rows) - len(deduped_rows)}。")
+    messages.append("原始 PDF 均仅在系统临时目录处理，并已在对应文件处理后删除。")
+
     report_url = f"/local_outputs/{run_name}/trade_review_report.html"
     return {
         "status": "ok",
@@ -229,11 +352,15 @@ def process_pdf(pdf_bytes, output_dir):
         "privacy_status": privacy_status,
         "messages": messages,
         "paths": {
-            "sanitized_trades": str(sanitized),
+            "sanitized_trades": str(deduped_sanitized),
+            "sanitized_trades_all": str(all_sanitized),
+            "merge_report": str(merge_report_path),
             "html_report": str(html_report),
+            "stable_html_report": str(stable_html),
             "html_report_relative": str(Path("local_outputs") / run_name / "trade_review_report.html"),
         },
         "report_url": report_url,
+        "stable_report_url": "/local_outputs/trade_review_report.html",
         "allowed_codex_read_files": ALLOWED_CODEX_READ_FILES,
     }
 
@@ -242,7 +369,6 @@ class PrivacyUploadHandler(BaseHTTPRequestHandler):
     server_version = "StockTradePrivacyRunner/1.0"
 
     def log_message(self, fmt, *args):
-        # Keep terminal logs free of uploaded filenames or data-derived content.
         print(f"[local-runner] {self.command} {self.path.split('?', 1)[0]}")
 
     def send_json(self, status, payload):
@@ -269,6 +395,9 @@ class PrivacyUploadHandler(BaseHTTPRequestHandler):
         path = unquote(parsed.path)
         if path in ("/", "/tools/privacy-upload.html"):
             self.send_file(TOOLS_DIR / "privacy-upload.html", "text/html; charset=utf-8")
+            return
+        if path == "/local_outputs/trade_review_report.html":
+            self.send_file(self.server.output_dir / "trade_review_report.html", "text/html; charset=utf-8")
             return
         if path.startswith("/local_outputs/"):
             parts = [part for part in posixpath.normpath(path).split("/") if part]
@@ -298,13 +427,15 @@ class PrivacyUploadHandler(BaseHTTPRequestHandler):
                 raise ProcessingError("文件大小不合法", ["PDF 为空或超过大小限制。"])
             content_type = self.headers.get("Content-Type", "")
             body = self.rfile.read(length)
-            pdf_bytes = parse_multipart_pdf(body, content_type)
-            result = process_pdf(pdf_bytes, self.server.output_dir)
+            uploads = parse_multipart_pdfs(body, content_type)
+            result = process_pdfs(uploads, self.server.output_dir)
             report_http_url = f"http://{HOST}:{self.server.server_port}{result['report_url']}"
+            stable_http_url = f"http://{HOST}:{self.server.server_port}{result['stable_report_url']}"
             html_report_path = result.get("paths", {}).get("html_report", "")
             print("处理完成。")
             print(f"本地服务地址：http://{HOST}:{self.server.server_port}")
             print(f"HTML 报告 HTTP 地址：{report_http_url}")
+            print(f"稳定入口 HTTP 地址：{stable_http_url}")
             print(f"HTML 报告本地文件路径：{html_report_path}")
             print(f"如果 127.0.0.1 无法访问，可直接执行：open {html_report_path}")
             self.send_json(HTTPStatus.OK, result)

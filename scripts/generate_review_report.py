@@ -27,38 +27,67 @@ def percent(value):
     return str(value)
 
 
+def build_name_map(per_stock, lifecycle):
+    mapping = {}
+    for code, item in per_stock.items():
+        name = item.get("security_name", "")
+        if name:
+            mapping[str(code)] = name
+    for code, item in lifecycle.items():
+        name = item.get("security_name", "")
+        if name and str(code) not in mapping:
+            mapping[str(code)] = name
+    return mapping
+
+
+def security_label(code, name=None, name_map=None):
+    if code is None:
+        return "无法判断"
+    code_text = str(code)
+    name_text = name or (name_map or {}).get(code_text, "")
+    return f"{code_text} {name_text}".strip()
+
+
+def label_text(text, name_map):
+    output = str(text)
+    for code in sorted(name_map, key=len, reverse=True):
+        label = security_label(code, name_map=name_map)
+        output = output.replace(code, label)
+    return output
+
+
 def line_items(items):
     if not items:
         return "- 无明显证据"
     return "\n".join(f"- {item}" for item in items)
 
 
-def top_stocks(per_stock, reverse=True, n=5):
+def top_stocks(per_stock, name_map, reverse=True, n=5):
     rows = sorted(per_stock.items(), key=lambda kv: kv[1].get("realized_pnl", 0), reverse=reverse)
     rows = [row for row in rows if (row[1].get("realized_pnl", 0) > 0 if reverse else row[1].get("realized_pnl", 0) < 0)]
     if not rows:
         return "- 无法判断"
-    return "\n".join(f"- {key} {value.get('security_name', '')}: {money(value.get('realized_pnl', 0))}" for key, value in rows[:n])
+    return "\n".join(f"- {security_label(key, value.get('security_name', ''), name_map)}: {money(value.get('realized_pnl', 0))}" for key, value in rows[:n])
 
 
-def triggered_flags(flags):
+def triggered_flags(flags, name_map):
     rows = []
     for name, item in flags.items():
         if item.get("status") == "触发":
-            evidence = "；".join(item.get("evidence") or ["无"])
+            evidence = "；".join(label_text(x, name_map) for x in (item.get("evidence") or ["无"]))
             rows.append(f"- {name}（{item.get('severity')}）：{item.get('interpretation')} 证据：{evidence}")
     return "\n".join(rows) if rows else "- 未触发明显行为风险；样本不足处仍需人工复核。"
 
 
-def risk_list(flags):
+def risk_list(flags, name_map):
     rows = []
     for name, item in flags.items():
         if item.get("status") in ("触发", "无法判断"):
-            rows.append(f"- {name}: {item.get('status')}。{item.get('limitation') or item.get('interpretation')}")
+            rows.append(f"- {name}: {item.get('status')}。{label_text(item.get('limitation') or item.get('interpretation'), name_map)}")
     return "\n".join(rows) if rows else "- 暂无突出风险。"
 
 
-def render_counterfactual(counterfactual):
+def render_counterfactual(counterfactual, name_map):
     summary = counterfactual.get("summary", {})
     rows = [
         "可能减少亏损：" + "、".join(summary.get("哪些规则可能减少亏损", ["无法判断"])),
@@ -67,11 +96,16 @@ def render_counterfactual(counterfactual):
     ]
     details = []
     for rule in counterfactual.get("rules", []):
+        affected = []
+        for stock in rule.get("affected_stocks", []):
+            if stock.get("security"):
+                affected.append(security_label(stock.get("security"), name_map=name_map))
+        affected_text = f" 样本：{'、'.join(affected)}。" if affected else ""
         change = rule.get("estimated_change")
         if isinstance(change, (int, float)):
-            details.append(f"- {rule.get('rule')}: 估算变化 {money(change)}。{rule.get('limitation', '')}")
+            details.append(f"- {rule.get('rule')}: 估算变化 {money(change)}。{affected_text}{label_text(rule.get('limitation', ''), name_map)}")
         else:
-            details.append(f"- {rule.get('rule')}: 影响样本 {len(rule.get('affected_stocks', []))} 个。{rule.get('interpretation', '')}")
+            details.append(f"- {rule.get('rule')}: 影响样本 {len(rule.get('affected_stocks', []))} 个。{affected_text}{label_text(rule.get('interpretation', ''), name_map)}")
     return "\n".join(rows + [""] + details)
 
 
@@ -91,6 +125,7 @@ def data_quality_section(metrics, trades):
 def build_report(trades, metrics, lifecycle, behavior, counterfactual):
     summary = metrics["summary"]
     per_stock = metrics.get("per_stock_pnl", {})
+    name_map = build_name_map(per_stock, lifecycle)
     flags = behavior.get("behavior_flags", {})
     monthly = metrics.get("monthly_pnl", {})
     month_lines = "\n".join(f"- {month}: {money(pnl)}" for month, pnl in monthly.items()) or "- 无法判断"
@@ -124,15 +159,15 @@ def build_report(trades, metrics, lifecycle, behavior, counterfactual):
 
 ## 盈利来源
 
-最大单票盈利：{most_profit.get("security")}，{money(most_profit.get("amount"))}
+最大单票盈利：{security_label(most_profit.get("security"), name_map=name_map)}，{money(most_profit.get("amount"))}
 
-{top_stocks(per_stock, reverse=True)}
+{top_stocks(per_stock, name_map, reverse=True)}
 
 ## 亏损来源
 
-最大单票亏损：{most_loss.get("security")}，{money(most_loss.get("amount"))}
+最大单票亏损：{security_label(most_loss.get("security"), name_map=name_map)}，{money(most_loss.get("amount"))}
 
-{top_stocks(per_stock, reverse=False)}
+{top_stocks(per_stock, name_map, reverse=False)}
 
 月度盈亏：
 
@@ -140,15 +175,15 @@ def build_report(trades, metrics, lifecycle, behavior, counterfactual):
 
 ## 行为模式
 
-{triggered_flags(flags)}
+{triggered_flags(flags, name_map)}
 
 ## 风险清单
 
-{risk_list(flags)}
+{risk_list(flags, name_map)}
 
 ## 反事实模拟
 
-{render_counterfactual(counterfactual)}
+{render_counterfactual(counterfactual, name_map)}
 
 ## 五角色复盘
 
@@ -160,8 +195,8 @@ def build_report(trades, metrics, lifecycle, behavior, counterfactual):
 
 ### 角色二：数据分析师
 
-- 盈利主要来自：{most_profit.get("security")}，金额 {money(most_profit.get("amount"))}。
-- 亏损主要来自：{most_loss.get("security")}，金额 {money(most_loss.get("amount"))}。
+- 盈利主要来自：{security_label(most_profit.get("security"), name_map=name_map)}，金额 {money(most_profit.get("amount"))}。
+- 亏损主要来自：{security_label(most_loss.get("security"), name_map=name_map)}，金额 {money(most_loss.get("amount"))}。
 - 最拖累结果的行为优先看：{", ".join([name for name, item in flags.items() if item.get("status") == "触发"][:3]) or "无法判断"}。
 
 ### 角色三：风控教练

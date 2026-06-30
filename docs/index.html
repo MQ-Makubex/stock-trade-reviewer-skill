@@ -27,14 +27,15 @@
 <main>
   <header>
     <h1>股票交割单 AI 复盘 Skill 使用说明</h1>
-    <p class="note">这是一个面向 Codex 的中文 Skill，用于在本机清洗券商交割单、计算历史交易指标，并生成个人交易复盘报告。</p>
+    <p class="note">这是一个面向 Codex 的中文 Skill，用于在本机清洗券商交割单、计算历史交易指标，并生成个人交易复盘报告。默认一句话调用即可打开本地隐私上传页。</p>
   </header>
 
   <section>
     <h2>它做什么</h2>
     <div class="grid">
-      <div class="card">从 CSV、Excel 或文字型 PDF 交割单中提取成交记录。</div>
+      <div class="card">从 CSV、Excel 或一个/多个文字型 PDF 交割单中提取成交记录。</div>
       <div class="card">在本机脱敏、检查隐私字段、标准化交易数据。</div>
+      <div class="card">多文件会自动合并为 sanitized_trades_all.csv，并去重为 sanitized_trades_deduped.csv。</div>
       <div class="card">计算盈亏、费用、单票表现、交易生命周期和行为模式。</div>
       <div class="card">生成 Markdown 和 HTML 个人交易复盘报告。</div>
     </div>
@@ -58,9 +59,11 @@
 
   <section>
     <h2>推荐使用流程</h2>
-    <p><strong>方式一：隐私交互模式。</strong>适合在 Codex 中一句话启动，然后在浏览器里上传 PDF。原始 PDF 只在系统临时目录处理，不进入项目目录。</p>
+    <p><strong>方式一：隐私交互模式。</strong>适合在 Codex 中一句话启动：</p>
+    <pre>请使用 $stock-trade-reviewer</pre>
+    <p>Codex 会默认执行下面的本地命令，然后在浏览器里上传一个或多个 PDF。原始 PDF 只在系统临时目录处理，不进入项目目录，也不会把原始文件名写入报告。</p>
     <pre>python3 scripts/interactive_runner.py --open</pre>
-    <p>打开后访问 <code>http://127.0.0.1:8787</code>，上传 PDF，等待生成 <code>local_outputs/run_时间戳/trade_review_report.html</code>。</p>
+    <p>打开后访问 <code>http://127.0.0.1:8787</code>，上传 PDF，等待生成 <code>local_outputs/run_时间戳/trade_review_report.html</code>。最新报告还会复制到 <code>local_outputs/trade_review_report.html</code>，方便下次直接打开。</p>
     <p><strong>方式二：命令行流程。</strong>适合已经熟悉终端的用户。</p>
     <ol>
       <li>准备券商交割单 PDF。</li>
@@ -107,9 +110,10 @@ python3 scripts/generate_html_report.py</pre>
     <ul>
       <li>本地服务只监听 <code>127.0.0.1</code>。</li>
       <li>上传 PDF 存在系统临时目录，不存入项目目录。</li>
+      <li>多个 PDF 仅使用 <code>file_001</code>、<code>file_002</code> 等内部编号，不记录原始文件名。</li>
       <li>脱敏后立即删除原始 PDF 临时文件。</li>
       <li>真实输出默认写到 <code>local_outputs/</code>，该目录不会提交到 Git。</li>
-      <li>Codex 只读取脱敏 CSV、隐私检查 JSON、指标 JSON 和 HTML 报告。</li>
+      <li>Codex 只读取脱敏 CSV、合并报告、隐私检查 JSON、指标 JSON 和 HTML 报告。</li>
     </ul>
   </section>
 </main>

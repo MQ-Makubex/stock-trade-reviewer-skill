@@ -42,6 +42,34 @@ def metric_card(label, value):
     return f'<div class="metric"><span>{e(label)}</span><strong>{e(value)}</strong></div>'
 
 
+def build_name_map(per_stock, lifecycle):
+    mapping = {}
+    for code, item in per_stock.items():
+        name = item.get("security_name", "")
+        if name:
+            mapping[str(code)] = name
+    for code, item in lifecycle.items():
+        name = item.get("security_name", "")
+        if name and str(code) not in mapping:
+            mapping[str(code)] = name
+    return mapping
+
+
+def security_label(code, name=None, name_map=None):
+    if code is None:
+        return "无法判断"
+    code_text = str(code)
+    name_text = name or (name_map or {}).get(code_text, "")
+    return f"{code_text} {name_text}".strip()
+
+
+def label_text(text, name_map):
+    output = str(text if text is not None else "")
+    for code in sorted(name_map, key=len, reverse=True):
+        output = output.replace(code, security_label(code, name_map=name_map))
+    return output
+
+
 def scan_sensitive(obj, path="root"):
     findings = []
     sensitive_keys = ["姓名", "身份证", "手机号", "资金账号", "资金帐号", "客户号", "股东账号", "股东帐号", "银行卡", "营业部", "地址"]
@@ -69,21 +97,21 @@ def scan_sensitive(obj, path="root"):
     return findings
 
 
-def top_stocks(per_stock, reverse=True):
+def top_stocks(per_stock, name_map, reverse=True):
     rows = sorted(per_stock.items(), key=lambda kv: kv[1].get("realized_pnl", 0), reverse=reverse)
     filtered = [row for row in rows if (row[1].get("realized_pnl", 0) > 0 if reverse else row[1].get("realized_pnl", 0) < 0)]
     if not filtered:
         return "<li>无法判断</li>"
     parts = []
     for code, item in filtered[:5]:
-        parts.append(f"<li><strong>{e(code)}</strong> {e(item.get('security_name', ''))}: {e(money(item.get('realized_pnl', 0)))}</li>")
+        parts.append(f"<li><strong>{e(security_label(code, item.get('security_name', ''), name_map))}</strong>: {e(money(item.get('realized_pnl', 0)))}</li>")
     return "".join(parts)
 
 
-def behavior_items(flags):
+def behavior_items(flags, name_map):
     parts = []
     for name, item in flags.items():
-        evidence = "；".join(str(x) for x in item.get("evidence", []) if x)
+        evidence = "；".join(label_text(x, name_map) for x in item.get("evidence", []) if x)
         parts.append(
             "<li>"
             f"<strong>{e(name)}</strong> "
@@ -96,19 +124,43 @@ def behavior_items(flags):
     return "".join(parts) if parts else "<li>无法判断</li>"
 
 
-def counterfactual_items(counterfactual):
+def counterfactual_items(counterfactual, name_map):
     parts = []
     for rule in counterfactual.get("rules", []):
         change = rule.get("estimated_change")
         summary = f"估算变化 {money(change)}" if isinstance(change, (int, float)) else f"影响样本 {len(rule.get('affected_stocks', []))} 个"
+        affected = []
+        for stock in rule.get("affected_stocks", []):
+            if stock.get("security"):
+                affected.append(security_label(stock.get("security"), name_map=name_map))
+        affected_text = "；样本：" + "、".join(affected) if affected else ""
         parts.append(
             "<li>"
             f"<strong>{e(rule.get('rule', ''))}</strong>"
-            f"<p>{e(summary)}</p>"
-            f"<small>{e(rule.get('limitation') or rule.get('interpretation') or '')}</small>"
+            f"<p>{e(summary + affected_text)}</p>"
+            f"<small>{e(label_text(rule.get('limitation') or rule.get('interpretation') or '', name_map))}</small>"
             "</li>"
         )
     return "".join(parts) if parts else "<li>无法判断</li>"
+
+
+def merge_summary_html(merge_report):
+    if not merge_report:
+        return ""
+    cards = "".join([
+        metric_card("上传文件数", merge_report.get("uploaded_files", "无法判断")),
+        metric_card("成功文件数", merge_report.get("success_count", "无法判断")),
+        metric_card("失败文件数", merge_report.get("failure_count", "无法判断")),
+        metric_card("去重前行数", merge_report.get("rows_before_dedupe", "无法判断")),
+        metric_card("去重后行数", merge_report.get("rows_after_dedupe", "无法判断")),
+        metric_card("删除重复行数", merge_report.get("duplicate_rows_removed", "无法判断")),
+    ])
+    return f"""
+  <section>
+    <h2>批量处理摘要</h2>
+    <div class="grid">{cards}</div>
+  </section>
+"""
 
 
 def extract_markdown_section(markdown, heading):
@@ -154,15 +206,17 @@ def markdown_lines_to_html(markdown):
     return "\n".join(output)
 
 
-def build_html(metrics, lifecycle, behavior, counterfactual, markdown):
+def build_html(metrics, lifecycle, behavior, counterfactual, markdown, merge_report=None):
     summary = metrics.get("summary", {})
     per_stock = metrics.get("per_stock_pnl", {})
+    name_map = build_name_map(per_stock, lifecycle)
     flags = behavior.get("behavior_flags", {})
     sensitive_findings = scan_sensitive({
         "metrics": metrics,
         "trade_lifecycle": lifecycle,
         "behavior_flags": behavior,
         "counterfactual_report": counterfactual,
+        "merge_report": merge_report or {},
         "markdown": markdown,
     })
     warning = ""
@@ -232,29 +286,31 @@ def build_html(metrics, lifecycle, behavior, counterfactual, markdown):
     <div class="grid">{metrics_html}</div>
   </section>
 
+  {merge_summary_html(merge_report)}
+
   <section>
     <h2>盈利来源</h2>
-    <ul>{top_stocks(per_stock, reverse=True)}</ul>
+    <ul>{top_stocks(per_stock, name_map, reverse=True)}</ul>
   </section>
 
   <section>
     <h2>亏损来源</h2>
-    <ul>{top_stocks(per_stock, reverse=False)}</ul>
+    <ul>{top_stocks(per_stock, name_map, reverse=False)}</ul>
   </section>
 
   <section>
     <h2>行为模式</h2>
-    <ul class="cards">{behavior_items(flags)}</ul>
+    <ul class="cards">{behavior_items(flags, name_map)}</ul>
   </section>
 
   <section>
     <h2>风险提示</h2>
-    <ul>{list_items([name + "：" + item.get("status", "无法判断") + "。" + (item.get("limitation") or item.get("interpretation") or "") for name, item in flags.items() if item.get("status") in ("触发", "无法判断")])}</ul>
+    <ul>{list_items([name + "：" + item.get("status", "无法判断") + "。" + label_text(item.get("limitation") or item.get("interpretation") or "", name_map) for name, item in flags.items() if item.get("status") in ("触发", "无法判断")])}</ul>
   </section>
 
   <section>
     <h2>反事实模拟</h2>
-    <ul class="cards">{counterfactual_items(counterfactual)}</ul>
+    <ul class="cards">{counterfactual_items(counterfactual, name_map)}</ul>
   </section>
 
   <section>
@@ -290,8 +346,10 @@ def main():
     parser.add_argument("behavior_json", nargs="?", default="behavior_flags.json")
     parser.add_argument("counterfactual_json", nargs="?", default="counterfactual_report.json")
     parser.add_argument("--markdown", default="trade_review_report.md")
+    parser.add_argument("--merge-report", default="")
     parser.add_argument("-o", "--output", default="trade_review_report.html")
     args = parser.parse_args()
+    merge_report = load_json(args.merge_report) if args.merge_report else None
 
     html_text = build_html(
         load_json(args.metrics_json),
@@ -299,6 +357,7 @@ def main():
         load_json(args.behavior_json),
         load_json(args.counterfactual_json),
         load_text(args.markdown),
+        merge_report,
     )
     Path(args.output).write_text(html_text, encoding="utf-8")
     print(f"wrote {args.output}")
