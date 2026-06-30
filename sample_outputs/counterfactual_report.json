@@ -1,0 +1,151 @@
+{
+  "scope": "只对历史成交结果做反事实模拟，不预测未来走势，不构成买入或卖出建议。",
+  "rules": [
+    {
+      "rule": "单票亏损达到 3% 时止损",
+      "original_pnl": -6370.62,
+      "simulated_pnl": -1114.62,
+      "estimated_change": 5256.0,
+      "affected_stocks": [
+        {
+          "security": "DEMOB",
+          "original_pnl": -5254.44,
+          "simulated_pnl": -924.47,
+          "estimated_change": 4329.97
+        },
+        {
+          "security": "DEMOD",
+          "original_pnl": -1646.4,
+          "simulated_pnl": -720.37,
+          "estimated_change": 926.03
+        }
+      ],
+      "limitation": "仅用已实现单票结果估算，无法知道盘中是否触发。"
+    },
+    {
+      "rule": "单票亏损达到 5% 时止损",
+      "original_pnl": -6370.62,
+      "simulated_pnl": -2211.19,
+      "estimated_change": 4159.43,
+      "affected_stocks": [
+        {
+          "security": "DEMOB",
+          "original_pnl": -5254.44,
+          "simulated_pnl": -1540.79,
+          "estimated_change": 3713.65
+        },
+        {
+          "security": "DEMOD",
+          "original_pnl": -1646.4,
+          "simulated_pnl": -1200.62,
+          "estimated_change": 445.78
+        }
+      ],
+      "limitation": "仅用已实现单票结果估算，无法知道盘中是否触发。"
+    },
+    {
+      "rule": "单票亏损达到 8% 时止损",
+      "original_pnl": -6370.62,
+      "simulated_pnl": -3581.44,
+      "estimated_change": 2789.18,
+      "affected_stocks": [
+        {
+          "security": "DEMOB",
+          "original_pnl": -5254.44,
+          "simulated_pnl": -2465.26,
+          "estimated_change": 2789.18
+        }
+      ],
+      "limitation": "仅用已实现单票结果估算，无法知道盘中是否触发。"
+    },
+    {
+      "rule": "盈利达到 5% 时分批止盈 50%",
+      "original_pnl": -6370.62,
+      "simulated_pnl": -6370.62,
+      "estimated_change": 0.0,
+      "affected_stocks": [],
+      "limitation": "用最终已实现结果反推，可能低估或高估分批止盈效果。"
+    },
+    {
+      "rule": "盈利达到 10% 时分批止盈 50%",
+      "original_pnl": -6370.62,
+      "simulated_pnl": -6370.62,
+      "estimated_change": 0.0,
+      "affected_stocks": [],
+      "limitation": "用最终已实现结果反推，可能低估或高估分批止盈效果。"
+    },
+    {
+      "rule": "单只股票最多交易 2 次",
+      "possible_loss_reduction": 1751.48,
+      "possible_profit_killed": 125.53,
+      "affected_stocks": [
+        {
+          "security": "DEMOB",
+          "trade_count": 3,
+          "pnl": -5254.44,
+          "estimated_removed_result": -1751.48
+        },
+        {
+          "security": "DEMOC",
+          "trade_count": 4,
+          "pnl": 86.57,
+          "estimated_removed_result": 43.28
+        },
+        {
+          "security": "DEMOE",
+          "trade_count": 4,
+          "pnl": 164.5,
+          "estimated_removed_result": 82.25
+        }
+      ],
+      "limitation": "按交易次数比例近似估算，不等同于真实重放交易路径。"
+    },
+    {
+      "rule": "持仓超过 20 天强制复盘",
+      "affected_stocks": [
+        {
+          "security": "DEMOB",
+          "holding_days": 39.5,
+          "realized_pnl": -5254.44
+        },
+        {
+          "security": "DEMOD",
+          "holding_days": 46.0,
+          "realized_pnl": -1646.4
+        }
+      ],
+      "interpretation": "该规则本身不模拟买卖，只识别需要暂停和复盘的历史样本。"
+    },
+    {
+      "rule": "单票亏损超过总资金 1.0% 后禁止加仓",
+      "affected_stocks": [
+        {
+          "security": "DEMOB",
+          "add_count_after_loss": 1,
+          "realized_pnl": -5254.44,
+          "capital_used": 113400.0
+        }
+      ],
+      "interpretation": "这些样本适合人工验证是否存在越亏越加。",
+      "limitation": "若缺少资金余额，总资金使用成交额近似，可信度较低。"
+    }
+  ],
+  "summary": {
+    "哪些规则可能减少亏损": [
+      "单票亏损达到 3% 时止损",
+      "单票亏损达到 5% 时止损",
+      "单票亏损达到 8% 时止损"
+    ],
+    "哪些规则可能错杀盈利": [
+      "无法判断"
+    ],
+    "哪些规则最适合继续人工验证": [
+      "单票亏损达到 3% 时止损",
+      "单票亏损达到 5% 时止损",
+      "单票亏损达到 8% 时止损",
+      "单只股票最多交易 2 次",
+      "持仓超过 20 天强制复盘",
+      "单票亏损超过总资金 1.0% 后禁止加仓"
+    ]
+  }
+}

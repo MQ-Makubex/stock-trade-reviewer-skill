@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>股票交割单 AI 复盘 Skill 使用说明</title>
+  <style>
+    :root { --ink:#1d2733; --muted:#647184; --line:#dfe5ec; --panel:#f7f9fb; --accent:#0f766e; --danger:#b42318; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); background:#fff; line-height:1.7; }
+    main { max-width:980px; margin:0 auto; padding:34px 20px 56px; }
+    header { padding-bottom:22px; border-bottom:1px solid var(--line); }
+    h1 { font-size:31px; margin:0 0 10px; }
+    h2 { font-size:22px; margin:32px 0 12px; }
+    p { margin:8px 0; }
+    code, pre { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+    pre { background:#101820; color:#f3f7fa; padding:13px 15px; border-radius:8px; overflow:auto; }
+    .note { color:var(--muted); }
+    .danger { border:1px solid #f3b4ad; background:#fff1f0; color:var(--danger); padding:12px 14px; border-radius:8px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; }
+    .card { border:1px solid var(--line); background:var(--panel); border-radius:8px; padding:14px; }
+    ol, ul { padding-left:22px; }
+    li { margin:7px 0; }
+    a { color:var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>股票交割单 AI 复盘 Skill 使用说明</h1>
+    <p class="note">这是一个面向 Codex 的中文 Skill，用于在本机清洗券商交割单、计算历史交易指标，并生成个人交易复盘报告。</p>
+  </header>
+
+  <section>
+    <h2>它做什么</h2>
+    <div class="grid">
+      <div class="card">从 CSV、Excel 或文字型 PDF 交割单中提取成交记录。</div>
+      <div class="card">在本机脱敏、检查隐私字段、标准化交易数据。</div>
+      <div class="card">计算盈亏、费用、单票表现、交易生命周期和行为模式。</div>
+      <div class="card">生成 Markdown 和 HTML 个人交易复盘报告。</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>它不做什么</h2>
+    <ul>
+      <li>不荐股。</li>
+      <li>不预测未来涨跌。</li>
+      <li>不提供买入、卖出或持有某只股票的建议。</li>
+      <li>不把真实交割单 PDF 或原始交易数据上传到服务器。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>隐私边界</h2>
+    <p class="danger">真实 PDF 不要上传给 AI。真实文件只在本机终端运行脚本。运行前请删除姓名、身份证、手机号、资金账号、银行卡号、客户号、股东账号、营业部、地址等信息。</p>
+    <p>PDF 流程只输出脱敏后的交易字段。资金余额默认删除；如果你主动传入 <code>--keep-balance</code>，仍建议再运行隐私检查。</p>
+  </section>
+
+  <section>
+    <h2>推荐使用流程</h2>
+    <ol>
+      <li>准备券商交割单 PDF。</li>
+      <li>本地脱敏：</li>
+    </ol>
+    <pre>python3 scripts/sanitize_pdf_statement.py 交割单.pdf -o sanitized_trades.csv</pre>
+    <ol start="3">
+      <li>隐私检查：</li>
+    </ol>
+    <pre>python3 scripts/privacy_guard.py sanitized_trades.csv</pre>
+    <ol start="4">
+      <li>标准化解析：</li>
+    </ol>
+    <pre>python3 scripts/parse_statement.py sanitized_trades.csv</pre>
+    <ol start="5">
+      <li>计算指标：</li>
+    </ol>
+    <pre>python3 scripts/compute_metrics.py cleaned_trades.csv</pre>
+    <ol start="6">
+      <li>补齐生命周期、行为诊断和反事实模拟：</li>
+    </ol>
+    <pre>python3 scripts/build_trade_lifecycle.py cleaned_trades.csv
+python3 scripts/detect_behavior_patterns.py cleaned_trades.csv metrics.json trade_lifecycle.json
+python3 scripts/counterfactual_simulator.py metrics.json trade_lifecycle.json</pre>
+    <ol start="7">
+      <li>生成复盘报告：</li>
+    </ol>
+    <pre>python3 scripts/generate_review_report.py
+python3 scripts/generate_html_report.py</pre>
+    <ol start="8">
+      <li>查看 HTML 报告：</li>
+    </ol>
+    <pre>open trade_review_report.html</pre>
+  </section>
+
+  <section>
+    <h2>先用虚构样例试跑</h2>
+    <p>项目内的 <code>sample_trades.csv</code> 和 <code>sample_outputs/</code> 是完全虚构数据，可用于确认环境是否正常。</p>
+    <pre>python3 scripts/parse_statement.py sample_trades.csv -o sample_outputs/cleaned_trades.csv</pre>
+  </section>
+</main>
+</body>
+</html>

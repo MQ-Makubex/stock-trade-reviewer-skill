@@ -1,0 +1,272 @@
+{
+  "DEMOA": {
+    "security_name": "虚构科技",
+    "average_cost_open_position": 0.0,
+    "open_quantity": 0,
+    "sell_revenue": 10284.35,
+    "realized_pnl": 279.15,
+    "trade_count": 2,
+    "holding_days": 3.0,
+    "holding_days_note": "基于 FIFO 已卖出部分估算",
+    "events": [
+      {
+        "date": "2025-01-03",
+        "side": "BUY",
+        "event": "建仓",
+        "quantity": 1000.0,
+        "price": 10.0,
+        "amount": 10000.0,
+        "fee": 5.2,
+        "position_before": 0,
+        "position_after": 1000.0,
+        "avg_cost_after": 10.0052,
+        "realized_pnl": 0.0,
+        "source_row": "2"
+      },
+      {
+        "date": "2025-01-06",
+        "side": "SELL",
+        "event": "清仓",
+        "quantity": 1000.0,
+        "price": 10.3,
+        "amount": 10300.0,
+        "fee": 15.65,
+        "position_before": 1000.0,
+        "position_after": 0,
+        "avg_cost_after": 0.0,
+        "realized_pnl": 279.15,
+        "source_row": "3"
+      }
+    ]
+  },
+  "DEMOB": {
+    "security_name": "虚构制造",
+    "average_cost_open_position": 0.0,
+    "open_quantity": 0,
+    "sell_revenue": 25561.28,
+    "realized_pnl": -5254.44,
+    "trade_count": 3,
+    "holding_days": 39.5,
+    "holding_days_note": "基于 FIFO 已卖出部分估算",
+    "events": [
+      {
+        "date": "2025-01-08",
+        "side": "BUY",
+        "event": "建仓",
+        "quantity": 800.0,
+        "price": 20.0,
+        "amount": 16000.0,
+        "fee": 8.16,
+        "position_before": 0,
+        "position_after": 800.0,
+        "avg_cost_after": 20.0102,
+        "realized_pnl": 0.0,
+        "source_row": "4"
+      },
+      {
+        "date": "2025-01-15",
+        "side": "BUY",
+        "event": "加仓",
+        "quantity": 800.0,
+        "price": 18.5,
+        "amount": 14800.0,
+        "fee": 7.56,
+        "position_before": 800.0,
+        "position_after": 1600.0,
+        "avg_cost_after": 19.259825,
+        "realized_pnl": 0.0,
+        "source_row": "5"
+      },
+      {
+        "date": "2025-02-20",
+        "side": "SELL",
+        "event": "清仓",
+        "quantity": 1600.0,
+        "price": 16.0,
+        "amount": 25600.0,
+        "fee": 38.72,
+        "position_before": 1600.0,
+        "position_after": 0,
+        "avg_cost_after": 0.0,
+        "realized_pnl": -5254.44,
+        "source_row": "6"
+      }
+    ]
+  },
+  "DEMOC": {
+    "security_name": "虚构波段",
+    "average_cost_open_position": 0.0,
+    "open_quantity": 0,
+    "sell_revenue": 31502.47,
+    "realized_pnl": 86.57,
+    "trade_count": 4,
+    "holding_days": 1.5,
+    "holding_days_note": "基于 FIFO 已卖出部分估算",
+    "events": [
+      {
+        "date": "2025-02-21",
+        "side": "BUY",
+        "event": "建仓",
+        "quantity": 500.0,
+        "price": 30.0,
+        "amount": 15000.0,
+        "fee": 7.6,
+        "position_before": 0,
+        "position_after": 500.0,
+        "avg_cost_after": 30.0152,
+        "realized_pnl": 0.0,
+        "source_row": "7"
+      },
+      {
+        "date": "2025-02-24",
+        "side": "SELL",
+        "event": "清仓",
+        "quantity": 500.0,
+        "price": 31.0,
+        "amount": 15500.0,
+        "fee": 23.35,
+        "position_before": 500.0,
+        "position_after": 0,
+        "avg_cost_after": 0.0,
+        "realized_pnl": 469.05,
+        "source_row": "8"
+      },
+      {
+        "date": "2025-03-03",
+        "side": "BUY",
+        "event": "建仓",
+        "quantity": 500.0,
+        "price": 32.8,
+        "amount": 16400.0,
+        "fee": 8.3,
+        "position_before": 0,
+        "position_after": 500.0,
+        "avg_cost_after": 32.8166,
+        "realized_pnl": 0.0,
+        "source_row": "9"
+      },
+      {
+        "date": "2025-03-03",
+        "side": "SELL",
+        "event": "清仓",
+        "quantity": 500.0,
+        "price": 32.1,
+        "amount": 16050.0,
+        "fee": 24.18,
+        "position_before": 500.0,
+        "position_after": 0,
+        "avg_cost_after": 0.0,
+        "realized_pnl": -382.48,
+        "source_row": "10"
+      }
+    ]
+  },
+  "DEMOD": {
+    "security_name": "虚构长持",
+    "average_cost_open_position": 0.0,
+    "open_quantity": 0,
+    "sell_revenue": 22366.0,
+    "realized_pnl": -1646.4,
+    "trade_count": 2,
+    "holding_days": 46.0,
+    "holding_days_note": "基于 FIFO 已卖出部分估算",
+    "events": [
+      {
+        "date": "2025-03-10",
+        "side": "BUY",
+        "event": "建仓",
+        "quantity": 2000.0,
+        "price": 12.0,
+        "amount": 24000.0,
+        "fee": 12.4,
+        "position_before": 0,
+        "position_after": 2000.0,
+        "avg_cost_after": 12.0062,
+        "realized_pnl": 0.0,
+        "source_row": "11"
+      },
+      {
+        "date": "2025-04-25",
+        "side": "SELL",
+        "event": "清仓",
+        "quantity": 2000.0,
+        "price": 11.2,
+        "amount": 22400.0,
+        "fee": 34.0,
+        "position_before": 2000.0,
+        "position_after": 0,
+        "avg_cost_after": 0.0,
+        "realized_pnl": -1646.4,
+        "source_row": "12"
+      }
+    ]
+  },
+  "DEMOE": {
+    "security_name": "虚构追高",
+    "average_cost_open_position": 0.0,
+    "open_quantity": 0,
+    "sell_revenue": 17373.5,
+    "realized_pnl": 164.5,
+    "trade_count": 4,
+    "holding_days": 2.5,
+    "holding_days_note": "基于 FIFO 已卖出部分估算",
+    "events": [
+      {
+        "date": "2025-05-05",
+        "side": "BUY",
+        "event": "建仓",
+        "quantity": 1000.0,
+        "price": 8.0,
+        "amount": 8000.0,
+        "fee": 4.2,
+        "position_before": 0,
+        "position_after": 1000.0,
+        "avg_cost_after": 8.0042,
+        "realized_pnl": 0.0,
+        "source_row": "13"
+      },
+      {
+        "date": "2025-05-08",
+        "side": "SELL",
+        "event": "清仓",
+        "quantity": 1000.0,
+        "price": 8.5,
+        "amount": 8500.0,
+        "fee": 12.95,
+        "position_before": 1000.0,
+        "position_after": 0,
+        "avg_cost_after": 0.0,
+        "realized_pnl": 482.85,
+        "source_row": "14"
+      },
+      {
+        "date": "2025-05-10",
+        "side": "BUY",
+        "event": "建仓",
+        "quantity": 1000.0,
+        "price": 9.2,
+        "amount": 9200.0,
+        "fee": 4.8,
+        "position_before": 0,
+        "position_after": 1000.0,
+        "avg_cost_after": 9.2048,
+        "realized_pnl": 0.0,
+        "source_row": "15"
+      },
+      {
+        "date": "2025-05-12",
+        "side": "SELL",
+        "event": "清仓",
+        "quantity": 1000.0,
+        "price": 8.9,
+        "amount": 8900.0,
+        "fee": 13.55,
+        "position_before": 1000.0,
+        "position_after": 0,
+        "avg_cost_after": 0.0,
+        "realized_pnl": -318.35,
+        "source_row": "16"
+      }
+    ]
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "summary": {
+    "total_trades": 15,
+    "buy_count": 8,
+    "sell_count": 7,
+    "stock_count": 5,
+    "total_buy_amount": 113400.0,
+    "total_sell_amount": 107250.0,
+    "total_fees": 220.62,
+    "realized_pnl": -6370.62,
+    "win_rate": 0.6,
+    "average_profit": 176.74,
+    "average_loss": -3450.42,
+    "profit_loss_ratio": 0.0512,
+    "max_single_stock_profit": {
+      "security": "DEMOA",
+      "amount": 279.15
+    },
+    "max_single_stock_loss": {
+      "security": "DEMOB",
+      "amount": -5254.44
+    },
+    "fee_ratio_to_turnover": 0.001
+  },
+  "per_stock_pnl": {
+    "DEMOA": {
+      "security_name": "虚构科技",
+      "realized_pnl": 279.15,
+      "realized_cost": 10005.2,
+      "sell_revenue": 10284.35,
+      "trade_count": 2
+    },
+    "DEMOB": {
+      "security_name": "虚构制造",
+      "realized_pnl": -5254.44,
+      "realized_cost": 30815.72,
+      "sell_revenue": 25561.28,
+      "trade_count": 3
+    },
+    "DEMOC": {
+      "security_name": "虚构波段",
+      "realized_pnl": 86.57,
+      "realized_cost": 31415.9,
+      "sell_revenue": 31502.47,
+      "trade_count": 4
+    },
+    "DEMOD": {
+      "security_name": "虚构长持",
+      "realized_pnl": -1646.4,
+      "realized_cost": 24012.4,
+      "sell_revenue": 22366.0,
+      "trade_count": 2
+    },
+    "DEMOE": {
+      "security_name": "虚构追高",
+      "realized_pnl": 164.5,
+      "realized_cost": 17209.0,
+      "sell_revenue": 17373.5,
+      "trade_count": 4
+    }
+  },
+  "monthly_pnl": {
+    "2025-01": 279.15,
+    "2025-02": -4785.39,
+    "2025-03": -382.48,
+    "2025-04": -1646.4,
+    "2025-05": 164.5
+  },
+  "data_warnings": {
+    "unmatched_sells": [],
+    "notes": []
+  }
+}

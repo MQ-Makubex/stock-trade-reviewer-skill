@@ -1,0 +1,101 @@
+{
+  "behavior_flags": {
+    "小赚大亏": {
+      "status": "触发",
+      "severity": "高",
+      "evidence": [
+        "平均盈利 176.74",
+        "平均亏损 -3450.42",
+        "亏损/盈利倍数 19.52"
+      ],
+      "interpretation": "亏损单的破坏力显著大于盈利单。",
+      "limitation": ""
+    },
+    "频繁交易": {
+      "status": "未触发",
+      "severity": "低",
+      "evidence": [
+        "最高单月交易 4 笔",
+        "最高单日交易 2 笔"
+      ],
+      "interpretation": "当前样本未显示明显频繁交易。",
+      "limitation": ""
+    },
+    "同一股票反复买卖": {
+      "status": "未触发",
+      "severity": "低",
+      "evidence": [],
+      "interpretation": "未发现单票过度反复交易。",
+      "limitation": ""
+    },
+    "单票亏损过大": {
+      "status": "触发",
+      "severity": "高",
+      "evidence": [
+        "DEMOB: -5254.44, 占总亏损 76.1%"
+      ],
+      "interpretation": "少数股票贡献了主要亏损，风险集中。",
+      "limitation": ""
+    },
+    "手续费消耗过高": {
+      "status": "触发",
+      "severity": "中",
+      "evidence": [
+        "总费用 220.62",
+        "费用/成交额 0.1000%",
+        "已实现盈亏 -6370.62"
+      ],
+      "interpretation": "费用对结果有明显侵蚀，尤其在高频或低胜率时会放大。",
+      "limitation": ""
+    },
+    "盈利拿不住": {
+      "status": "触发",
+      "severity": "中",
+      "evidence": [
+        "DEMOA: 盈利 279.15, 持仓 3.0 天",
+        "DEMOC: 盈利 86.57, 持仓 1.5 天",
+        "DEMOE: 盈利 164.50, 持仓 2.5 天"
+      ],
+      "interpretation": "盈利交易持仓很短，需检查是否过早兑现。",
+      "limitation": "只使用成交日期，缺少盘中和未成交价格。"
+    },
+    "亏损持有过久": {
+      "status": "触发",
+      "severity": "高",
+      "evidence": [
+        "DEMOB: 亏损 -5254.44, 持仓 39.5 天",
+        "DEMOD: 亏损 -1646.40, 持仓 46.0 天"
+      ],
+      "interpretation": "亏损交易持有较久，需检查止损与复盘纪律。",
+      "limitation": "仅基于已卖出部分估算。"
+    },
+    "疑似情绪交易": {
+      "status": "触发",
+      "severity": "中",
+      "evidence": [
+        "2025-03-03 DEMOC: 同日买卖"
+      ],
+      "interpretation": "存在短时间集中交易或同日反向交易，疑似情绪交易。",
+      "limitation": "没有委托时间和下单原因，只能标记为疑似。"
+    },
+    "疑似追高": {
+      "status": "触发",
+      "severity": "中",
+      "evidence": [
+        "DEMOC: 买入价 32.80 高于此前卖出价 31.00 超过 5%",
+        "DEMOE: 买入价 9.20 高于此前卖出价 8.50 超过 5%"
+      ],
+      "interpretation": "成交记录显示疑似卖飞后更高价追回。",
+      "limitation": "缺少市场行情，无法判断买入时是否处于市场高位。"
+    },
+    "疑似补仓摊薄幻觉": {
+      "status": "触发",
+      "severity": "中",
+      "evidence": [
+        "DEMOB: 下跌后继续买入，最终已实现盈亏 -5254.44"
+      ],
+      "interpretation": "存在越跌越买且结果未改善的迹象，疑似补仓摊薄幻觉。",
+      "limitation": "缺少交易理由和未实现盈亏，只能用成交价格与结果近似判断。"
+    }
+  }
+}
