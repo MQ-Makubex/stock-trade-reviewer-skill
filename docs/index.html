@@ -58,6 +58,10 @@
 
   <section>
     <h2>推荐使用流程</h2>
+    <p><strong>方式一：隐私交互模式。</strong>适合在 Codex 中一句话启动，然后在浏览器里上传 PDF。原始 PDF 只在系统临时目录处理，不进入项目目录。</p>
+    <pre>python3 scripts/interactive_runner.py --open</pre>
+    <p>打开后访问 <code>http://127.0.0.1:8787</code>，上传 PDF，等待生成 <code>local_outputs/trade_review_report.html</code>。</p>
+    <p><strong>方式二：命令行流程。</strong>适合已经熟悉终端的用户。</p>
     <ol>
       <li>准备券商交割单 PDF。</li>
       <li>本地脱敏：</li>
@@ -96,6 +100,17 @@ python3 scripts/generate_html_report.py</pre>
     <h2>先用虚构样例试跑</h2>
     <p>项目内的 <code>sample_trades.csv</code> 和 <code>sample_outputs/</code> 是完全虚构数据，可用于确认环境是否正常。</p>
     <pre>python3 scripts/parse_statement.py sample_trades.csv -o sample_outputs/cleaned_trades.csv</pre>
+  </section>
+
+  <section>
+    <h2>交互模式的安全规则</h2>
+    <ul>
+      <li>本地服务只监听 <code>127.0.0.1</code>。</li>
+      <li>上传 PDF 存在系统临时目录，不存入项目目录。</li>
+      <li>脱敏后立即删除原始 PDF 临时文件。</li>
+      <li>真实输出默认写到 <code>local_outputs/</code>，该目录不会提交到 Git。</li>
+      <li>Codex 只读取脱敏 CSV、隐私检查 JSON、指标 JSON 和 HTML 报告。</li>
+    </ul>
   </section>
 </main>
 </body>

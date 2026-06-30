@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>隐私交互模式 - 股票交割单本地复盘</title>
+  <style>
+    :root { --ink:#17202a; --muted:#667085; --line:#d7dee8; --panel:#f8fafc; --accent:#0f766e; --danger:#b42318; --ok:#067647; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); background:#fff; line-height:1.65; }
+    main { max-width:920px; margin:0 auto; padding:32px 20px 56px; }
+    h1 { font-size:30px; margin:0 0 8px; }
+    h2 { font-size:21px; margin:28px 0 12px; }
+    .muted { color:var(--muted); }
+    .alert { border:1px solid #f3b4ad; background:#fff1f0; color:var(--danger); padding:12px 14px; border-radius:8px; }
+    .panel { border:1px solid var(--line); background:var(--panel); border-radius:8px; padding:16px; margin:14px 0; }
+    .drop { border:2px dashed #9aa8b8; border-radius:10px; padding:26px; text-align:center; background:#fff; }
+    input[type=file] { margin:12px 0; }
+    button, .button { display:inline-block; border:0; background:var(--accent); color:#fff; padding:9px 14px; border-radius:7px; cursor:pointer; text-decoration:none; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    code { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+    pre { white-space:pre-wrap; background:#101820; color:#f3f7fa; padding:12px; border-radius:8px; overflow:auto; }
+    .ok { color:var(--ok); }
+    .bad { color:var(--danger); }
+    dl { display:grid; grid-template-columns:160px 1fr; gap:8px 12px; }
+    dt { color:var(--muted); }
+    dd { margin:0; word-break:break-all; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>隐私交互模式</h1>
+    <p class="muted">上传股票交割单 PDF 后，本地脚本会在本机脱敏、检查隐私并生成复盘报告。</p>
+  </header>
+
+  <p class="alert">这是本地处理页面，只监听 127.0.0.1，不上传服务器，不联网。原始 PDF 只临时保存在系统临时目录，脱敏后立即删除。Codex 不读取、不打印、不分析原始 PDF 内容。</p>
+
+  <section class="panel">
+    <h2>上传 PDF</h2>
+    <form id="uploadForm" enctype="multipart/form-data">
+      <div class="drop">
+        <p>请选择券商交割单 PDF。请先确认文件中没有不必要的姓名、身份证、手机号、资金账号、银行卡号等信息。</p>
+        <input id="pdfInput" name="pdf" type="file" accept="application/pdf,.pdf" required>
+        <br>
+        <button id="submitButton" type="submit">开始本地处理</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>处理结果</h2>
+    <div id="status" class="muted">等待上传。</div>
+    <div id="result"></div>
+  </section>
+
+  <section class="panel">
+    <h2>字段说明</h2>
+    <p class="muted">脱敏 CSV 只保留交易复盘所需字段，例如发生日期、买卖方向、证券代码、证券名称、成交数量、成交价格、净发生金额和费用字段。资金余额默认不保留。</p>
+  </section>
+</main>
+<script>
+  const form = document.getElementById("uploadForm");
+  const statusEl = document.getElementById("status");
+  const resultEl = document.getElementById("result");
+  const button = document.getElementById("submitButton");
+
+  function escapeText(value) {
+    return String(value ?? "").replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
+  }
+
+  function renderResult(data) {
+    const cls = data.status === "ok" ? "ok" : "bad";
+    const lines = data.messages || [];
+    const details = data.paths || {};
+    const reportLink = data.report_url ? `<p><a class="button" href="${escapeText(data.report_url)}" target="_blank" rel="noopener">打开 HTML 报告</a></p>` : "";
+    resultEl.innerHTML = `
+      <p class="${cls}"><strong>${escapeText(data.title || data.status)}</strong></p>
+      <pre>${escapeText(lines.join("\\n"))}</pre>
+      <dl>
+        <dt>隐私检查</dt><dd>${escapeText(data.privacy_status || "未完成")}</dd>
+        <dt>脱敏 CSV</dt><dd><code>${escapeText(details.sanitized_trades || "")}</code></dd>
+        <dt>HTML 报告</dt><dd><code>${escapeText(details.html_report || "")}</code></dd>
+      </dl>
+      ${reportLink}
+    `;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const file = document.getElementById("pdfInput").files[0];
+    if (!file) return;
+    button.disabled = true;
+    statusEl.textContent = "正在本机处理，请不要关闭此页面。";
+    resultEl.innerHTML = "";
+    const body = new FormData();
+    body.append("pdf", file);
+    try {
+      const response = await fetch("/upload", { method: "POST", body });
+      const data = await response.json();
+      renderResult(data);
+      statusEl.textContent = response.ok ? "处理完成。" : "处理失败。";
+    } catch (error) {
+      statusEl.textContent = "处理失败。";
+      renderResult({ status:"error", title:"请求失败", messages:[String(error)] });
+    } finally {
+      button.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

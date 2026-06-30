@@ -7,7 +7,7 @@ description: Analyze user-provided stock trade statements in CSV, Excel, or loca
 
 ## 使用场景
 
-当用户提供股票交割单、成交记录、交易流水或 PDF 脱敏后的交易 CSV，并希望做个人交易复盘、行为诊断、风控检查、反事实规则验证或生成中文复盘报告时使用本 Skill。
+当用户提供股票交割单、成交记录、交易流水或 PDF 脱敏后的交易 CSV，并希望做个人交易复盘、行为诊断、风控检查、反事实规则验证或生成中文复盘报告时使用本 Skill。若用户希望在 Codex 中一句话启动处理真实 PDF，优先使用“隐私交互模式”。
 
 ## 输入文件
 
@@ -15,7 +15,32 @@ description: Analyze user-provided stock trade statements in CSV, Excel, or loca
 - 真实文件不要上传给 AI。运行前提醒用户删除姓名、身份证、手机号、资金账号、银行卡号、客户号、股东账号、营业部、地址等信息。
 - 如果字段缺失或数据不足，相关结论必须写 `无法判断`。
 
+## 隐私交互模式
+
+启动命令：
+
+```bash
+python3 scripts/interactive_runner.py --open
+```
+
+- 本地页面地址：`http://127.0.0.1:8787`
+- 服务只监听 `127.0.0.1`，不监听 `0.0.0.0`。
+- 用户在浏览器上传 PDF；原始 PDF 只保存在 `tempfile.TemporaryDirectory()`，不得进入项目目录。
+- 脚本完成 PDF 脱敏后立即删除原始临时 PDF。
+- Codex 不读取、不打印、不分析原始 PDF 内容。
+- 真实输出默认写入 `local_outputs/`，该目录已加入 `.gitignore`。
+- 交互完成后，Codex 只允许读取 `sanitized_trades.csv`、`privacy_guard_report.json`、`cleaned_trades.csv`、`metrics.json`、`trade_lifecycle.json`、`behavior_flags.json`、`counterfactual_report.json`、`trade_review_report.html`。
+
 ## 推荐工作流
+
+### 方式一：浏览器隐私交互
+
+1. 运行 `python3 scripts/interactive_runner.py --open`
+2. 在本地页面上传 PDF。
+3. 等待隐私检查和复盘流程完成。
+4. 点击页面中的“打开 HTML 报告”。
+
+### 方式二：命令行流程
 
 1. PDF 本地脱敏：`python3 scripts/sanitize_pdf_statement.py 交割单.pdf -o sanitized_trades.csv`
 2. 隐私检查：`python3 scripts/privacy_guard.py sanitized_trades.csv`
@@ -38,11 +63,13 @@ description: Analyze user-provided stock trade statements in CSV, Excel, or loca
 - `counterfactual_report.json`
 - `trade_review_report.md`
 - `trade_review_report.html`
+- 交互模式默认输出目录：`local_outputs/`
 
 ## 隐私边界
 
 - 默认本地处理数据，不上传服务器。
 - 不把原始 PDF 全文交给 AI 分析。
+- 交互模式的原始 PDF 只能保存在系统临时目录，并在脱敏后删除。
 - `sanitize_pdf_statement.py` 默认删除资金余额；只有用户传 `--keep-balance` 才保留。
 - `privacy_guard.py` 发现身份、账号、手机号、银行卡、地址等敏感信息时必须失败。
 - 公开仓库只能提交源码、文档和完全虚构样例，不提交真实 PDF、真实交割单、真实输出或真实账户信息。
@@ -58,6 +85,7 @@ description: Analyze user-provided stock trade statements in CSV, Excel, or loca
 
 - 打开 `docs/index.html` 查看中文使用说明。
 - 打开 `tools/local-runner.html` 查看本地命令向导。
+- 打开 `tools/privacy-upload.html` 或运行 `scripts/interactive_runner.py --open` 使用隐私交互模式。
 - 运行 `scripts/generate_html_report.py` 后打开 `trade_review_report.html` 查看复盘报告。
 
 ## 字段不匹配时

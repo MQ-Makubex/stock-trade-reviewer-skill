@@ -38,6 +38,11 @@
   <section>
     <h2>完整流程</h2>
     <div class="step">
+      <div class="row"><h3>0. 推荐：启动隐私交互模式</h3><button data-copy="python3 scripts/interactive_runner.py --open">复制命令</button></div>
+      <p class="muted">启动后访问 http://127.0.0.1:8787，在浏览器上传 PDF。原始 PDF 只进系统临时目录，脱敏后删除；真实输出写入 local_outputs/。</p>
+      <pre>python3 scripts/interactive_runner.py --open</pre>
+    </div>
+    <div class="step">
       <div class="row"><h3>1. PDF 本地脱敏</h3><button data-copy="python3 scripts/sanitize_pdf_statement.py 交割单.pdf -o sanitized_trades.csv">复制命令</button></div>
       <pre>python3 scripts/sanitize_pdf_statement.py 交割单.pdf -o sanitized_trades.csv</pre>
     </div>
@@ -97,6 +102,7 @@ python3 scripts/generate_html_report.py</pre>
     <details><summary>扫描版 PDF 怎么办？</summary><p>当前脚本优先处理文字型 PDF。如果提示需要 OCR，请使用本地 OCR 工具先识别，暂时不要联网上传。</p></details>
     <details><summary>为什么不保留资金余额？</summary><p>资金余额可能暴露账户规模。默认删除；如果确实需要，请使用 <code>--keep-balance</code> 并运行隐私检查。</p></details>
     <details><summary>报告能不能作为买卖建议？</summary><p>不能。报告只做历史复盘，不荐股、不预测涨跌、不提供买卖建议。</p></details>
+    <details><summary>隐私交互模式会把 PDF 放在哪里？</summary><p>原始 PDF 只放在 Python 的系统临时目录中，脱敏后立即删除；项目目录只保留 local_outputs/ 中的脱敏结果和报告。</p></details>
   </section>
 </main>
 <script>
