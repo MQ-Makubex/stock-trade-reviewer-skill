@@ -10,6 +10,7 @@ import sys
 import tempfile
 import uuid
 import webbrowser
+from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -50,6 +51,12 @@ def safe_output_dir(path):
     output_dir = Path(path).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     return output_dir
+
+
+def make_run_dir(base_output_dir):
+    run_name = "run_" + datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:8]
+    run_dir = safe_output_dir(Path(base_output_dir) / run_name)
+    return run_name, run_dir
 
 
 def is_relative_to(child, parent):
@@ -152,7 +159,8 @@ def load_privacy_summary(path):
 
 
 def process_pdf(pdf_bytes, output_dir):
-    output_dir = safe_output_dir(output_dir)
+    base_output_dir = safe_output_dir(output_dir)
+    run_name, run_dir = make_run_dir(base_output_dir)
     temp_pdf_deleted = False
     messages = ["原始 PDF 已保存到系统临时目录。"]
     with tempfile.TemporaryDirectory(prefix="stock_trade_pdf_") as tmpdir:
@@ -161,17 +169,17 @@ def process_pdf(pdf_bytes, output_dir):
         if not is_relative_to(tmp_path, tempfile.gettempdir()):
             raise ProcessingError("临时目录异常", ["原始 PDF 未写入系统临时目录，已停止处理。"], status_code=500)
 
-        sanitized = output_dir / "sanitized_trades.csv"
-        sanitize_report = output_dir / "sanitize_pdf_report.json"
-        privacy_report = output_dir / "privacy_guard_report.json"
-        cleaned = output_dir / "cleaned_trades.csv"
-        metrics = output_dir / "metrics.json"
-        lifecycle = output_dir / "trade_lifecycle.json"
-        behavior = output_dir / "behavior_flags.json"
-        counterfactual = output_dir / "counterfactual_report.json"
-        markdown = output_dir / "trade_review_report.md"
-        html_report = output_dir / "trade_review_report.html"
-        mapping = output_dir / "field_mapping_suggestions.json"
+        sanitized = run_dir / "sanitized_trades.csv"
+        sanitize_report = run_dir / "sanitize_pdf_report.json"
+        privacy_report = run_dir / "privacy_guard_report.json"
+        cleaned = run_dir / "cleaned_trades.csv"
+        metrics = run_dir / "metrics.json"
+        lifecycle = run_dir / "trade_lifecycle.json"
+        behavior = run_dir / "behavior_flags.json"
+        counterfactual = run_dir / "counterfactual_report.json"
+        markdown = run_dir / "trade_review_report.md"
+        html_report = run_dir / "trade_review_report.html"
+        mapping = run_dir / "field_mapping_suggestions.json"
 
         try:
             run_command([
@@ -214,6 +222,7 @@ def process_pdf(pdf_bytes, output_dir):
             raise ProcessingError("复盘流程失败", ["脱敏和隐私检查已完成，但后续指标或报告生成失败。"], privacy_status=privacy_status, status_code=500)
 
     messages.append(f"临时 PDF 删除状态：{'已删除' if temp_pdf_deleted else '无需删除'}。")
+    report_url = f"/local_outputs/{run_name}/trade_review_report.html"
     return {
         "status": "ok",
         "title": "处理完成",
@@ -222,8 +231,9 @@ def process_pdf(pdf_bytes, output_dir):
         "paths": {
             "sanitized_trades": str(sanitized),
             "html_report": str(html_report),
+            "html_report_relative": str(Path("local_outputs") / run_name / "trade_review_report.html"),
         },
-        "report_url": "/local_outputs/trade_review_report.html",
+        "report_url": report_url,
         "allowed_codex_read_files": ALLOWED_CODEX_READ_FILES,
     }
 
@@ -260,15 +270,21 @@ class PrivacyUploadHandler(BaseHTTPRequestHandler):
         if path in ("/", "/tools/privacy-upload.html"):
             self.send_file(TOOLS_DIR / "privacy-upload.html", "text/html; charset=utf-8")
             return
-        if path == "/local_outputs/trade_review_report.html":
-            self.send_file(self.server.output_dir / "trade_review_report.html", "text/html; charset=utf-8")
-            return
         if path.startswith("/local_outputs/"):
-            requested = posixpath.basename(path)
-            if requested not in ALLOWED_CODEX_READ_FILES:
+            parts = [part for part in posixpath.normpath(path).split("/") if part]
+            if len(parts) != 3 or parts[0] != "local_outputs":
                 self.send_error(HTTPStatus.FORBIDDEN)
                 return
-            self.send_file(self.server.output_dir / requested)
+            run_name, requested = parts[1], parts[2]
+            if not run_name.startswith("run_") or requested not in ALLOWED_CODEX_READ_FILES:
+                self.send_error(HTTPStatus.FORBIDDEN)
+                return
+            target = self.server.output_dir / run_name / requested
+            if not is_relative_to(target, self.server.output_dir):
+                self.send_error(HTTPStatus.FORBIDDEN)
+                return
+            content_type = "text/html; charset=utf-8" if requested.endswith(".html") else None
+            self.send_file(target, content_type)
             return
         self.send_error(HTTPStatus.NOT_FOUND)
 
@@ -284,8 +300,16 @@ class PrivacyUploadHandler(BaseHTTPRequestHandler):
             body = self.rfile.read(length)
             pdf_bytes = parse_multipart_pdf(body, content_type)
             result = process_pdf(pdf_bytes, self.server.output_dir)
+            report_http_url = f"http://{HOST}:{self.server.server_port}{result['report_url']}"
+            html_report_path = result.get("paths", {}).get("html_report", "")
+            print("处理完成。")
+            print(f"本地服务地址：http://{HOST}:{self.server.server_port}")
+            print(f"HTML 报告 HTTP 地址：{report_http_url}")
+            print(f"HTML 报告本地文件路径：{html_report_path}")
+            print(f"如果 127.0.0.1 无法访问，可直接执行：open {html_report_path}")
             self.send_json(HTTPStatus.OK, result)
         except ProcessingError as exc:
+            print(f"处理失败：{exc.title}")
             self.send_json(exc.status_code, {
                 "status": "error",
                 "title": exc.title,
@@ -294,6 +318,7 @@ class PrivacyUploadHandler(BaseHTTPRequestHandler):
                 "paths": {},
             })
         except Exception:
+            print("本地服务异常：处理请求失败。")
             self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {
                 "status": "error",
                 "title": "本地服务异常",
@@ -329,6 +354,8 @@ def main():
         server.serve_forever()
     except KeyboardInterrupt:
         print("\n本地服务已停止。")
+    except Exception as exc:
+        print(f"本地服务异常退出：{type(exc).__name__}")
     finally:
         server.server_close()
 

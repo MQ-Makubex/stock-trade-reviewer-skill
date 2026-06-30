@@ -28,7 +28,7 @@ python3 scripts/interactive_runner.py --open
 - 用户在浏览器上传 PDF；原始 PDF 只保存在 `tempfile.TemporaryDirectory()`，不得进入项目目录。
 - 脚本完成 PDF 脱敏后立即删除原始临时 PDF。
 - Codex 不读取、不打印、不分析原始 PDF 内容。
-- 真实输出默认写入 `local_outputs/`，该目录已加入 `.gitignore`。
+- 真实输出默认写入 `local_outputs/run_时间戳/`，该目录已加入 `.gitignore`。
 - 交互完成后，Codex 只允许读取 `sanitized_trades.csv`、`privacy_guard_report.json`、`cleaned_trades.csv`、`metrics.json`、`trade_lifecycle.json`、`behavior_flags.json`、`counterfactual_report.json`、`trade_review_report.html`。
 
 ## 推荐工作流
@@ -63,7 +63,7 @@ python3 scripts/interactive_runner.py --open
 - `counterfactual_report.json`
 - `trade_review_report.md`
 - `trade_review_report.html`
-- 交互模式默认输出目录：`local_outputs/`
+- 交互模式默认输出目录：`local_outputs/run_时间戳/`
 
 ## 隐私边界
 

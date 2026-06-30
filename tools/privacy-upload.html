@@ -79,6 +79,7 @@
       <dl>
         <dt>隐私检查</dt><dd>${escapeText(data.privacy_status || "未完成")}</dd>
         <dt>脱敏 CSV</dt><dd><code>${escapeText(details.sanitized_trades || "")}</code></dd>
+        <dt>报告相对路径</dt><dd><code>${escapeText(details.html_report_relative || "")}</code></dd>
         <dt>HTML 报告</dt><dd><code>${escapeText(details.html_report || "")}</code></dd>
       </dl>
       ${reportLink}
