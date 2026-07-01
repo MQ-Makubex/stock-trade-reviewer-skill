@@ -33,7 +33,7 @@
 <main>
   <header>
     <h1>股票教练智能体</h1>
-    <p class="muted">上传当天交易文件，填写交易想法和阅读文章，本地生成每日交易教练报告并沉淀 playbook。</p>
+    <p class="muted">上传当天交易文件，填写交易想法和阅读文章，本地生成每日交易教练报告、雪球发布版复盘与长期 playbook。</p>
   </header>
 
   <p class="alert">PDF、CSV、XLSX 只在本机处理，不上传服务器。PDF 原文不会交给 AI。截图成交单只有在你显式发给 Codex 识别时才由 AI 提取标准 trades；请先裁剪或打码姓名、账号、资金余额等信息。</p>
@@ -107,6 +107,7 @@
     const lines = data.messages || [];
     const details = data.paths || {};
     const reportLink = data.report_url ? `<p><a class="button" href="${escapeText(data.report_url)}" target="_blank" rel="noopener">打开每日 HTML 报告</a></p>` : "";
+    const xueqiuLink = data.xueqiu_post_url ? `<p><a class="button" href="${escapeText(data.xueqiu_post_url)}" target="_blank" rel="noopener">打开雪球发布版</a></p>` : "";
     const stableLink = data.stable_report_url ? `<p><a class="button" href="${escapeText(data.stable_report_url)}" target="_blank" rel="noopener">打开稳定入口</a></p>` : "";
     resultEl.innerHTML = `
       <p class="${cls}"><strong>${escapeText(data.title || data.status)}</strong></p>
@@ -119,8 +120,10 @@
         <dt>买前反问</dt><dd><code>${escapeText(details.pre_trade_guard || "")}</code></dd>
         <dt>报告相对路径</dt><dd><code>${escapeText(details.html_report_relative || "")}</code></dd>
         <dt>HTML 报告</dt><dd><code>${escapeText(details.html_report || "")}</code></dd>
+        <dt>雪球发布版</dt><dd><code>${escapeText(details.xueqiu_post_html || "")}</code></dd>
       </dl>
       ${reportLink}
+      ${xueqiuLink}
       ${stableLink}
     `;
   }

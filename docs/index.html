@@ -24,7 +24,7 @@
 <main>
   <header>
     <h1>股票教练智能体使用说明</h1>
-    <p class="note">stock-trading-coach-agent 用于每日交易复盘：交易事实、交易想法、文章观点、叙事污染检查、行为诊断和长期 playbook。</p>
+    <p class="note">stock-trading-coach-agent 用于每日交易复盘：交易事实、交易想法、文章观点、宏观镜片、叙事污染检查、行为诊断和长期 playbook。</p>
   </header>
 
   <section>
@@ -33,7 +33,9 @@
       <div class="card">保留交割单本地脱敏、隐私检查、指标计算和行为诊断。</div>
       <div class="card">记录 daily journal：当天交易想法、意图、情绪和计划。</div>
       <div class="card">提取文章观点并检查叙事污染。</div>
+      <div class="card">手动蒸馏宏观博主观点，形成市场环境观察镜片。</div>
       <div class="card">生成每日 HTML、Markdown 和 JSON 教练报告。</div>
+      <div class="card">生成可发雪球的每日复盘与明日计划草稿。</div>
       <div class="card">保守沉淀 playbooks.json：可复制、待验证、应避免。</div>
       <div class="card">基于历史亏损模式生成买入前风控反问。</div>
     </div>
@@ -56,6 +58,18 @@
     <p>或手动运行：</p>
     <pre>python3 scripts/interactive_runner.py --open</pre>
     <p>打开 <code>http://127.0.0.1:8787</code> 后上传交易文件，填写交易想法和文章信息。最终报告在 <code>local_outputs/run_时间戳/daily_coach_report.html</code>，稳定入口为 <code>local_outputs/daily_coach_report.html</code>。</p>
+    <p>雪球发布版在 <code>local_outputs/run_时间戳/daily_xueqiu_post.html</code>，稳定入口为 <code>local_outputs/daily_xueqiu_post.html</code>。</p>
+  </section>
+
+  <section>
+    <h2>手动更新宏观镜片</h2>
+    <p>例如蒸馏冰冰小美雪球主页最近文章：</p>
+    <pre>python3 scripts/macro_lens_digest.py --source xueqiu --user-url "https://xueqiu.com/u/7143769715" --limit 50</pre>
+    <ul>
+      <li>只保存标题、URL、摘要、宏观镜片和风险标签，不保存全文。</li>
+      <li>宏观镜片只用于市场情况判断、教练解释和明日条件计划。</li>
+      <li>如果雪球页面需要登录或反爬，脚本会提示使用具体文章 URL 或粘贴文本。</li>
+    </ul>
   </section>
 
   <section>
@@ -65,6 +79,7 @@
       <li>原始上传文件只进入系统临时目录，处理后删除。</li>
       <li><code>local_outputs/</code> 保存真实报告，<code>local_state/</code> 保存长期 playbook；两者都不提交 Git。</li>
       <li>文章 URL 可联网抓取，但长期只保存标题、URL、观点摘要和污染检查，不保存全文。</li>
+      <li>雪球发布版可显示股票代码和名称，但成交金额默认转换为“单位”表达。</li>
     </ul>
   </section>
 

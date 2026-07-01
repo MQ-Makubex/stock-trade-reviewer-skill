@@ -43,6 +43,16 @@
       <pre>open local_outputs/daily_coach_report.html</pre>
     </div>
     <div class="step">
+      <div class="row"><h3>更新冰冰小美宏观镜片</h3><button data-copy='python3 scripts/macro_lens_digest.py --source xueqiu --user-url "https://xueqiu.com/u/7143769715" --limit 50'>复制命令</button></div>
+      <pre>python3 scripts/macro_lens_digest.py --source xueqiu --user-url "https://xueqiu.com/u/7143769715" --limit 50</pre>
+      <p class="muted">手动触发联网读取；只保存标题、URL、摘要、宏观镜片和风险标签，不保存全文。</p>
+    </div>
+    <div class="step">
+      <div class="row"><h3>查看雪球发布版</h3><button data-copy="open local_outputs/daily_xueqiu_post.html">复制命令</button></div>
+      <pre>open local_outputs/daily_xueqiu_post.html</pre>
+      <p class="muted">发布版显示股票代码和名称，金额默认用“单位”表达，明日计划为条件触发式纪律。</p>
+    </div>
+    <div class="step">
       <div class="row"><h3>只做旧交割单复盘</h3><button data-copy="python3 scripts/parse_statement.py sanitized_trades.csv && python3 scripts/compute_metrics.py cleaned_trades.csv">复制命令</button></div>
       <pre>python3 scripts/parse_statement.py sanitized_trades.csv
 python3 scripts/compute_metrics.py cleaned_trades.csv</pre>
@@ -53,6 +63,8 @@ python3 scripts/compute_metrics.py cleaned_trades.csv</pre>
     <h2>常见问题</h2>
     <details><summary>playbook 为什么不会一次成功就可复制？</summary><p>为了避免结果偏差，至少 3 次类似证据后才升级为可复制；亏损或风险失控模式会进入应避免。</p></details>
     <details><summary>文章会保存全文吗？</summary><p>不会。只保存 URL、标题、观点摘要和叙事污染检查。</p></details>
+    <details><summary>宏观博主观点会直接触发买卖吗？</summary><p>不会。宏观镜片只用于市场环境观察、教练解释和条件化反问。</p></details>
+    <details><summary>雪球发布版能直接发吗？</summary><p>它是脱敏草稿，仍建议你人工检查措辞，确认没有账户、资金余额或确定性买卖表达。</p></details>
     <details><summary>报告能作为买卖建议吗？</summary><p>不能。它只做历史复盘、行为诊断和风控训练。</p></details>
   </section>
 </main>

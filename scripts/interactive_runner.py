@@ -44,8 +44,12 @@ ALLOWED_CODEX_READ_FILES = [
     "daily_coach_report.json",
     "daily_coach_report.md",
     "daily_coach_report.html",
+    "daily_xueqiu_post.md",
+    "daily_xueqiu_post.html",
     "playbooks.json",
     "pre_trade_guard.json",
+    "macro_lenses.json",
+    "source_articles_index.json",
 ]
 
 SANITIZED_FIELDS = [
@@ -590,10 +594,14 @@ def process_coach_request(fields, uploads, output_dir, state_dir):
         playbooks = state_dir / "playbooks.json"
         playbooks_snapshot = run_dir / "playbooks.json"
         guard = run_dir / "pre_trade_guard.json"
+        macro_lenses = state_dir / "macro_lenses.json"
         coach_json = run_dir / "daily_coach_report.json"
         coach_md = run_dir / "daily_coach_report.md"
         coach_html = run_dir / "daily_coach_report.html"
+        xueqiu_md = run_dir / "daily_xueqiu_post.md"
+        xueqiu_html = run_dir / "daily_xueqiu_post.html"
         stable_coach_html = base_output_dir / "daily_coach_report.html"
+        stable_xueqiu_html = base_output_dir / "daily_xueqiu_post.html"
 
         journal_input.write_text(json.dumps(build_journal_input(fields), ensure_ascii=False, indent=2), encoding="utf-8")
         article_args = [PYTHON, str(SCRIPT_DIR / "article_digest.py"), "--journal-json", str(journal), "-o", str(article)]
@@ -613,7 +621,7 @@ def process_coach_request(fields, uploads, output_dir, state_dir):
             article_args,
             [PYTHON, str(SCRIPT_DIR / "playbook_manager.py"), "--metrics", str(metrics), "--lifecycle", str(lifecycle), "--behavior", str(behavior), "--journal", str(journal), "--state", str(playbooks)],
             [PYTHON, str(SCRIPT_DIR / "pre_trade_guard.py"), "--playbooks", str(playbooks), "--behavior", str(behavior), "-o", str(guard)],
-            [PYTHON, str(SCRIPT_DIR / "generate_coach_report.py"), "--metrics", str(metrics), "--lifecycle", str(lifecycle), "--behavior", str(behavior), "--journal", str(journal), "--article", str(article), "--playbooks", str(playbooks), "--guard", str(guard), "--json-output", str(coach_json), "--markdown-output", str(coach_md), "--html-output", str(coach_html)],
+            [PYTHON, str(SCRIPT_DIR / "generate_coach_report.py"), "--metrics", str(metrics), "--lifecycle", str(lifecycle), "--behavior", str(behavior), "--journal", str(journal), "--article", str(article), "--playbooks", str(playbooks), "--guard", str(guard), "--macro-lenses", str(macro_lenses), "--json-output", str(coach_json), "--markdown-output", str(coach_md), "--html-output", str(coach_html), "--xueqiu-markdown-output", str(xueqiu_md), "--xueqiu-html-output", str(xueqiu_html)],
         ]
         try:
             for step in steps:
@@ -624,6 +632,7 @@ def process_coach_request(fields, uploads, output_dir, state_dir):
         if playbooks.exists():
             shutil.copy2(playbooks, playbooks_snapshot)
         shutil.copy2(coach_html, stable_coach_html)
+        shutil.copy2(xueqiu_html, stable_xueqiu_html)
 
     messages.append(f"上传文件数：{len(uploads)}，成功：{success_count}，失败：{len(uploads) - success_count}。")
     messages.append(f"去重前行数：{len(all_rows)}，去重后行数：{len(deduped_rows)}，删除重复行：{len(all_rows) - len(deduped_rows)}。")
@@ -645,10 +654,16 @@ def process_coach_request(fields, uploads, output_dir, state_dir):
             "pre_trade_guard": str(guard),
             "html_report": str(coach_html),
             "stable_html_report": str(stable_coach_html),
+            "xueqiu_post_md": str(xueqiu_md),
+            "xueqiu_post_html": str(xueqiu_html),
+            "stable_xueqiu_post_html": str(stable_xueqiu_html),
             "html_report_relative": str(Path("local_outputs") / run_name / "daily_coach_report.html"),
+            "xueqiu_post_relative": str(Path("local_outputs") / run_name / "daily_xueqiu_post.html"),
         },
         "report_url": report_url,
         "stable_report_url": "/local_outputs/daily_coach_report.html",
+        "xueqiu_post_url": f"/local_outputs/{run_name}/daily_xueqiu_post.html",
+        "stable_xueqiu_post_url": "/local_outputs/daily_xueqiu_post.html",
         "allowed_codex_read_files": ALLOWED_CODEX_READ_FILES,
     }
 
@@ -690,6 +705,9 @@ class PrivacyUploadHandler(BaseHTTPRequestHandler):
         if path == "/local_outputs/daily_coach_report.html":
             self.send_file(self.server.output_dir / "daily_coach_report.html", "text/html; charset=utf-8")
             return
+        if path == "/local_outputs/daily_xueqiu_post.html":
+            self.send_file(self.server.output_dir / "daily_xueqiu_post.html", "text/html; charset=utf-8")
+            return
         if path.startswith("/local_outputs/"):
             parts = [part for part in posixpath.normpath(path).split("/") if part]
             if len(parts) != 3 or parts[0] != "local_outputs":
@@ -722,12 +740,18 @@ class PrivacyUploadHandler(BaseHTTPRequestHandler):
             result = process_coach_request(fields, uploads, self.server.output_dir, self.server.state_dir)
             report_http_url = f"http://{HOST}:{self.server.server_port}{result['report_url']}"
             stable_http_url = f"http://{HOST}:{self.server.server_port}{result['stable_report_url']}"
+            xueqiu_http_url = f"http://{HOST}:{self.server.server_port}{result.get('xueqiu_post_url', '')}" if result.get("xueqiu_post_url") else ""
             html_report_path = result.get("paths", {}).get("html_report", "")
+            xueqiu_post_path = result.get("paths", {}).get("xueqiu_post_html", "")
             print("处理完成。")
             print(f"本地服务地址：http://{HOST}:{self.server.server_port}")
             print(f"HTML 报告 HTTP 地址：{report_http_url}")
             print(f"稳定入口 HTTP 地址：{stable_http_url}")
+            if xueqiu_http_url:
+                print(f"雪球发布版 HTTP 地址：{xueqiu_http_url}")
             print(f"HTML 报告本地文件路径：{html_report_path}")
+            if xueqiu_post_path:
+                print(f"雪球发布版本地文件路径：{xueqiu_post_path}")
             print(f"如果 127.0.0.1 无法访问，可直接执行：open {html_report_path}")
             self.send_json(HTTPStatus.OK, result)
         except ProcessingError as exc:

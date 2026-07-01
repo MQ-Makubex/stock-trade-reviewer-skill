@@ -16,6 +16,7 @@ description: Daily Chinese stock trading coach agent for user-provided historica
 - 支持 `.pdf`、`.csv`、`.xlsx`、`.xlsm` 交易文件；PDF 继续本地脱敏，CSV/XLSX 只在本机临时目录解析。
 - 支持当天交易想法、交易意图、情绪状态、计划与复盘备注。
 - 支持文章 URL 或粘贴文章文本；URL 可联网抓取，但长期只保存摘要和叙事污染检查，不保存全文。
+- 支持手动更新宏观镜片，例如冰冰小美雪球主页；宏观镜片只用于市场环境观察和教练提问。
 - 截图成交单仅在用户显式上传给 Codex 识别时使用 AI 抽取标准 trades；建议先裁剪或打码身份、账号、资金余额。
 
 ## 工作流
@@ -25,7 +26,17 @@ description: Daily Chinese stock trading coach agent for user-provided historica
 3. 本地完成隐私检查、标准化解析、交易统计、行为诊断和反事实模拟。
 4. 生成 `daily_journal.json`、`article_digest.json`、`pre_trade_guard.json`。
 5. 保守更新 `local_state/playbooks.json`。
-6. 生成 `daily_coach_report.json`、`daily_coach_report.md`、`daily_coach_report.html`。
+6. 读取可选 `local_state/macro_lenses.json`，生成市场情况判断和教练判断理由。
+7. 生成 `daily_coach_report.json`、`daily_coach_report.md`、`daily_coach_report.html`。
+8. 生成用于雪球发布的 `daily_xueqiu_post.md`、`daily_xueqiu_post.html`。
+
+手动更新宏观镜片：
+
+```bash
+python3 scripts/macro_lens_digest.py --source xueqiu --user-url "https://xueqiu.com/u/7143769715" --limit 50
+```
+
+该命令只保存标题、URL、摘要、宏观镜片和风险标签，不保存文章全文。若雪球页面需要登录或反爬，应改用具体文章 URL 或手动粘贴文本，不伪造抓取结果。
 
 明确要求“只做交割单复盘”时，可以沿用原 `trade_review_report.html` 流程。
 
@@ -59,9 +70,13 @@ description: Daily Chinese stock trading coach agent for user-provided historica
 - `daily_coach_report.json`
 - `daily_coach_report.md`
 - `daily_coach_report.html`
+- `daily_xueqiu_post.md`
+- `daily_xueqiu_post.html`
 - `local_state/playbooks.json`
+- `local_state/macro_lenses.json`
 
 真实输出默认写入 `local_outputs/run_时间戳/`；最新 HTML 报告复制到 `local_outputs/daily_coach_report.html`。
+雪球发布版稳定入口复制到 `local_outputs/daily_xueqiu_post.html`。
 
 ## 隐私边界
 
@@ -76,6 +91,8 @@ description: Daily Chinese stock trading coach agent for user-provided historica
 - 不荐股。
 - 不预测未来涨跌。
 - 不输出买入、卖出或持有某只股票的建议。
+- 明日计划必须写成条件触发式纪律，不能写确定性动作。
+- 市场情况判断必须给出理由，说明依据来自成交事实、用户 journal、文章观点或宏观镜片；证据不足时写 `无法判断`。
 - 所有结论必须基于用户提供的历史成交、当天想法和文章观点。
 - 数据不足时必须写 `无法判断`。
 - 稳定盈利定义为寻找可重复、可验证、风险可控的交易模式，而不是预测未来。

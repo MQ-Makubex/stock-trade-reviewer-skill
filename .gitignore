@@ -22,6 +22,10 @@ behavior_flags.json
 counterfactual_report.json
 trade_review_report.md
 trade_review_report.html
+daily_xueqiu_post.md
+daily_xueqiu_post.html
+macro_lenses.json
+source_articles_index.json
 field_mapping_suggestions.json
 cleaned_trades.csv
 sanitized_trades.csv

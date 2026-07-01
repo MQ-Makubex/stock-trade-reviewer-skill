@@ -1,7 +1,8 @@
 import unittest
 
 from scripts.article_digest import narrative_checks
-from scripts.generate_coach_report import build_report
+from scripts.generate_coach_report import build_report, to_xueqiu_markdown
+from scripts.macro_lens_digest import article_from_text, aggregate_lenses
 from scripts.playbook_manager import empty_store, update_playbooks
 
 
@@ -66,6 +67,51 @@ class CoachModuleTests(unittest.TestCase):
         )
         self.assertIn("today_qualitative", report)
         self.assertTrue(report["today_qualitative"].endswith("。"))
+
+    def test_macro_lens_enters_reasoning_not_trade_advice(self):
+        report = build_report(
+            {"summary": {"total_trades": 2, "buy_count": 1, "sell_count": 1, "realized_pnl": 20.0, "total_fees": 1.0}, "per_stock_pnl": {}},
+            {},
+            {"behavior_flags": {}},
+            {"trade_date": "2026-01-02", "trading_idea": "大盘看不懂，科技和防守风格切换不确定，5日线试错。", "plan": "破10日线止损。"},
+            {"narrative_pollution_checks": {}, "viewpoints": ["虚构观点"]},
+            {"playbooks": {"可复制": [], "待验证": [], "应避免": []}},
+            {"questions": []},
+            {"source": {"name": "虚构宏观博主", "updated_at": "2026-01-02"}, "macro_lenses": [{"lens": "市场风格", "observation": "风格切换需要市场确认", "risk_tags": ["可验证事实不足"]}]},
+        )
+        self.assertIn("market_context", report)
+        self.assertIn("coach_reasoning", report)
+        self.assertIn("macro_lens", report)
+        joined = "\n".join(report["tomorrow_discipline"])
+        self.assertIn("条件计划", joined)
+        self.assertNotIn("建议买入", joined)
+        self.assertNotIn("建议卖出", joined)
+
+    def test_xueqiu_post_uses_units_and_conditions(self):
+        report = build_report(
+            {
+                "summary": {"total_trades": 1, "buy_count": 1, "sell_count": 0, "realized_pnl": 0.0, "total_fees": 1.0},
+                "per_stock_pnl": {"301421": {"security_name": "虚构光电", "trade_count": 1, "sell_revenue": 0.0, "realized_cost": 59600.0, "realized_pnl": 0.0}},
+            },
+            {},
+            {"behavior_flags": {}},
+            {"trade_date": "2026-01-02", "trading_idea": "5日线试错，破10日线止损。", "plan": "只用一单位。"},
+            {"narrative_pollution_checks": {}, "viewpoints": []},
+            {"playbooks": {"可复制": [], "待验证": [], "应避免": []}},
+            {"questions": []},
+            {},
+        )
+        post = to_xueqiu_markdown(report)
+        self.assertIn("301421 虚构光电", post)
+        self.assertIn("约1单位", post)
+        self.assertIn("条件计划", post)
+        self.assertNotIn("59,600", post)
+
+    def test_macro_digest_extracts_lenses_without_full_text(self):
+        article = article_from_text("https://example.test/a", "虚构文章", "政策周期影响风险偏好。长期主义不能替代止损纪律。")
+        lenses = aggregate_lenses([article])
+        self.assertTrue(lenses)
+        self.assertTrue(any("宏观" in item["lens"] or "政策" in item["lens"] for item in lenses))
 
 
 if __name__ == "__main__":
