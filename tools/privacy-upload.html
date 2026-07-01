@@ -3,25 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>隐私交互模式 - 股票交割单本地复盘</title>
+  <title>股票教练智能体 - 每日交易复盘</title>
   <style>
     :root { --ink:#17202a; --muted:#667085; --line:#d7dee8; --panel:#f8fafc; --accent:#0f766e; --danger:#b42318; --ok:#067647; }
     body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); background:#fff; line-height:1.65; }
-    main { max-width:920px; margin:0 auto; padding:32px 20px 56px; }
+    main { max-width:960px; margin:0 auto; padding:32px 20px 56px; }
     h1 { font-size:30px; margin:0 0 8px; }
     h2 { font-size:21px; margin:28px 0 12px; }
+    label { display:block; margin:12px 0 6px; font-weight:600; }
+    input[type=text], input[type=date], input[type=url], textarea { width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:8px; padding:9px 10px; font:inherit; background:#fff; }
+    textarea { min-height:84px; resize:vertical; }
     .muted { color:var(--muted); }
     .alert { border:1px solid #f3b4ad; background:#fff1f0; color:var(--danger); padding:12px 14px; border-radius:8px; }
     .panel { border:1px solid var(--line); background:var(--panel); border-radius:8px; padding:16px; margin:14px 0; }
-    .drop { border:2px dashed #9aa8b8; border-radius:10px; padding:26px; text-align:center; background:#fff; }
-    input[type=file] { margin:12px 0; }
+    .drop { border:2px dashed #9aa8b8; border-radius:10px; padding:22px; background:#fff; }
     button, .button { display:inline-block; border:0; background:var(--accent); color:#fff; padding:9px 14px; border-radius:7px; cursor:pointer; text-decoration:none; }
     button:disabled { opacity:.55; cursor:not-allowed; }
     code { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
     pre { white-space:pre-wrap; background:#101820; color:#f3f7fa; padding:12px; border-radius:8px; overflow:auto; }
     .ok { color:var(--ok); }
     .bad { color:var(--danger); }
-    dl { display:grid; grid-template-columns:160px 1fr; gap:8px 12px; }
+    .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+    dl { display:grid; grid-template-columns:170px 1fr; gap:8px 12px; }
     dt { color:var(--muted); }
     dd { margin:0; word-break:break-all; }
   </style>
@@ -29,33 +32,64 @@
 <body>
 <main>
   <header>
-    <h1>隐私交互模式</h1>
-    <p class="muted">上传一个或多个股票交割单 PDF 后，本地脚本会在本机脱敏、合并去重、检查隐私并生成复盘报告。每个文件只使用内部编号处理，不记录原始文件名。</p>
+    <h1>股票教练智能体</h1>
+    <p class="muted">上传当天交易文件，填写交易想法和阅读文章，本地生成每日交易教练报告并沉淀 playbook。</p>
   </header>
 
-  <p class="alert">这是本地处理页面，只监听 127.0.0.1，不上传服务器，不联网。原始 PDF 只临时保存在系统临时目录，脱敏后立即删除。Codex 不读取、不打印、不分析原始 PDF 内容，也不读取原始文件名。</p>
+  <p class="alert">PDF、CSV、XLSX 只在本机处理，不上传服务器。PDF 原文不会交给 AI。截图成交单只有在你显式发给 Codex 识别时才由 AI 提取标准 trades；请先裁剪或打码姓名、账号、资金余额等信息。</p>
 
   <section class="panel">
-    <h2>上传 PDF</h2>
+    <h2>每日输入</h2>
     <form id="uploadForm" enctype="multipart/form-data">
       <div class="drop">
-        <p>请选择一个或多个券商交割单 PDF。请先确认文件中没有不必要的姓名、身份证、手机号、资金账号、银行卡号等信息。</p>
-        <input id="pdfInput" name="pdf" type="file" accept="application/pdf,.pdf" multiple required>
-        <br>
-        <button id="submitButton" type="submit">开始本地处理</button>
+        <p>请选择一个或多个交易文件。支持 PDF、CSV、XLSX；每个文件只使用内部编号处理，不记录原始文件名。</p>
+        <input id="fileInput" name="trade_files" type="file" accept="application/pdf,.pdf,.csv,.xlsx,.xlsm" multiple required>
       </div>
+
+      <div class="row">
+        <div>
+          <label for="tradeDate">交易日期</label>
+          <input id="tradeDate" name="trade_date" type="date">
+        </div>
+        <div>
+          <label for="mood">情绪状态</label>
+          <input id="mood" name="mood" type="text" placeholder="例如：平静、焦虑、想追回亏损">
+        </div>
+      </div>
+
+      <label for="tradingIdea">当天交易想法</label>
+      <textarea id="tradingIdea" name="trading_idea" placeholder="写下你今天为什么交易、想验证什么。"></textarea>
+
+      <label for="tradeIntent">交易意图</label>
+      <textarea id="tradeIntent" name="trade_intent" placeholder="例如：做 T 降成本、兑现盈利、控制亏损、验证某个模式。"></textarea>
+
+      <label for="plan">计划与复盘备注</label>
+      <textarea id="plan" name="plan" placeholder="写下原计划、退出条件、盘后复盘。"></textarea>
+
+      <label for="articleUrl">阅读文章 URL</label>
+      <input id="articleUrl" name="article_url" type="url" placeholder="可选。允许本地 runner 联网抓取并只保存摘要。">
+
+      <label for="articleText">或粘贴文章观点</label>
+      <textarea id="articleText" name="article_text" placeholder="可选。长期只保存观点摘要和叙事污染检查，不保存全文。"></textarea>
+
+      <label><input id="articleInfluenced" name="article_influenced" type="checkbox"> 今天交易动作受文章观点影响</label>
+
+      <label for="disciplineTags">纪律标签</label>
+      <input id="disciplineTags" name="discipline_tags" type="text" placeholder="可选，用逗号分隔，例如：追高,补仓,止损">
+
+      <p><button id="submitButton" type="submit">生成每日教练报告</button></p>
     </form>
   </section>
 
   <section class="panel">
     <h2>处理结果</h2>
-    <div id="status" class="muted">等待上传。</div>
+    <div id="status" class="muted">等待提交。</div>
     <div id="result"></div>
   </section>
 
   <section class="panel">
-    <h2>字段说明</h2>
-    <p class="muted">脱敏 CSV 只保留交易复盘所需字段，例如发生日期、买卖方向、证券代码、证券名称、成交数量、成交价格、净发生金额和费用字段。资金余额默认不保留。多个文件会合并为 sanitized_trades_all.csv，并按交易关键字段去重生成 sanitized_trades_deduped.csv。</p>
+    <h2>边界</h2>
+    <p class="muted">报告只做历史复盘、行为诊断和风控训练。不荐股，不预测涨跌，不输出买入/卖出建议。playbook 至少需要 3 次类似证据才会进入“可复制”。</p>
   </section>
 </main>
 <script>
@@ -72,15 +106,17 @@
     const cls = data.status === "ok" ? "ok" : "bad";
     const lines = data.messages || [];
     const details = data.paths || {};
-    const reportLink = data.report_url ? `<p><a class="button" href="${escapeText(data.report_url)}" target="_blank" rel="noopener">打开 HTML 报告</a></p>` : "";
+    const reportLink = data.report_url ? `<p><a class="button" href="${escapeText(data.report_url)}" target="_blank" rel="noopener">打开每日 HTML 报告</a></p>` : "";
     const stableLink = data.stable_report_url ? `<p><a class="button" href="${escapeText(data.stable_report_url)}" target="_blank" rel="noopener">打开稳定入口</a></p>` : "";
     resultEl.innerHTML = `
       <p class="${cls}"><strong>${escapeText(data.title || data.status)}</strong></p>
       <pre>${escapeText(lines.join("\\n"))}</pre>
       <dl>
         <dt>隐私检查</dt><dd>${escapeText(data.privacy_status || "未完成")}</dd>
-        <dt>去重脱敏 CSV</dt><dd><code>${escapeText(details.sanitized_trades || "")}</code></dd>
-        <dt>合并报告</dt><dd><code>${escapeText(details.merge_report || "")}</code></dd>
+        <dt>标准交易 CSV</dt><dd><code>${escapeText(details.cleaned_trades || "")}</code></dd>
+        <dt>文章摘要</dt><dd><code>${escapeText(details.article_digest || "")}</code></dd>
+        <dt>Playbook</dt><dd><code>${escapeText(details.playbooks || "")}</code></dd>
+        <dt>买前反问</dt><dd><code>${escapeText(details.pre_trade_guard || "")}</code></dd>
         <dt>报告相对路径</dt><dd><code>${escapeText(details.html_report_relative || "")}</code></dd>
         <dt>HTML 报告</dt><dd><code>${escapeText(details.html_report || "")}</code></dd>
       </dl>
@@ -91,13 +127,12 @@
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const files = Array.from(document.getElementById("pdfInput").files);
+    const files = Array.from(document.getElementById("fileInput").files);
     if (!files.length) return;
     button.disabled = true;
     statusEl.textContent = "正在本机处理，请不要关闭此页面。";
     resultEl.innerHTML = "";
-    const body = new FormData();
-    files.forEach(file => body.append("pdf", file));
+    const body = new FormData(form);
     try {
       const response = await fetch("/upload", { method: "POST", body });
       const data = await response.json();

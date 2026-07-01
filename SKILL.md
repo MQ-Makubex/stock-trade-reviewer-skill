@@ -1,102 +1,84 @@
 ---
-name: stock-trade-reviewer
-description: Analyze user-provided stock trade statements in CSV, Excel, or locally sanitized PDF-derived CSV format to clean transaction data, compute historical metrics, diagnose trading behavior, simulate discipline rules on historical results, and generate Chinese Markdown/HTML personal trade review reports. Use only for historical self-review; never recommend stocks, predict prices, or advise buying/selling a security.
+name: stock-trading-coach-agent
+description: Daily Chinese stock trading coach agent for user-provided historical trades, trade journals, and article viewpoints. It keeps the original stock statement privacy workflow, locally sanitizes PDF/CSV/XLSX statements, diagnoses behavior, checks narrative pollution, builds conservative playbooks, and generates Markdown/HTML/JSON daily coaching reports. Never recommend stocks, predict prices, or advise buying/selling.
 ---
 
-# 股票交割单复盘 Skill
+# 股票教练智能体
 
 ## 使用场景
 
-当用户提供股票交割单、成交记录、交易流水或 PDF 脱敏后的交易 CSV，并希望做个人交易复盘、行为诊断、风控检查、反事实规则验证或生成中文复盘报告时使用本 Skill。
+当用户希望复盘股票交割单、记录当天交易想法、分析阅读文章对交易的影响、沉淀个人交易模式或生成买入前风控反问时使用本 Skill。
 
-默认行为：用户只说“请使用 $stock-trade-reviewer”或“隐私交互”时，直接运行 `python3 scripts/interactive_runner.py --open`，打开本地隐私上传页。不要默认输出长教程，不要读取原始 PDF。
+默认行为：用户只说“请使用 $stock-trading-coach-agent”时，直接运行 `python3 scripts/interactive_runner.py --open`，打开本地每日教练页面。不要默认读取原始 PDF，不要输出长教程。
 
 ## 输入文件
 
-- 支持 `.csv`、`.xlsx`；PDF 先用 `scripts/sanitize_pdf_statement.py` 在本机脱敏成 `sanitized_trades.csv`。
-- 隐私交互模式支持一个或多个 PDF；多文件会合并为 `sanitized_trades_all.csv`，再去重为 `sanitized_trades_deduped.csv`。
-- 真实文件不要上传给 AI。运行前提醒用户删除姓名、身份证、手机号、资金账号、银行卡号、客户号、股东账号、营业部、地址等信息。
-- 如果字段缺失或数据不足，相关结论必须写 `无法判断`。
+- 支持 `.pdf`、`.csv`、`.xlsx`、`.xlsm` 交易文件；PDF 继续本地脱敏，CSV/XLSX 只在本机临时目录解析。
+- 支持当天交易想法、交易意图、情绪状态、计划与复盘备注。
+- 支持文章 URL 或粘贴文章文本；URL 可联网抓取，但长期只保存摘要和叙事污染检查，不保存全文。
+- 截图成交单仅在用户显式上传给 Codex 识别时使用 AI 抽取标准 trades；建议先裁剪或打码身份、账号、资金余额。
 
-## 隐私交互模式
+## 工作流
 
-启动命令：
+1. 本地交互：`python3 scripts/interactive_runner.py --open`
+2. 上传一个或多个交易文件，填写交易想法和文章信息。
+3. 本地完成隐私检查、标准化解析、交易统计、行为诊断和反事实模拟。
+4. 生成 `daily_journal.json`、`article_digest.json`、`pre_trade_guard.json`。
+5. 保守更新 `local_state/playbooks.json`。
+6. 生成 `daily_coach_report.json`、`daily_coach_report.md`、`daily_coach_report.html`。
 
-```bash
-python3 scripts/interactive_runner.py --open
-```
+明确要求“只做交割单复盘”时，可以沿用原 `trade_review_report.html` 流程。
 
-- 本地页面地址：`http://127.0.0.1:8787`
-- 服务只监听 `127.0.0.1`，不监听 `0.0.0.0`。
-- 用户在浏览器上传一个或多个 PDF；原始 PDF 只保存在 `tempfile.TemporaryDirectory()`，不得进入项目目录。
-- 每个 PDF 仅使用内部编号 `file_001`、`file_002` 处理，不记录原始文件名。
-- 脚本完成 PDF 脱敏后立即删除原始临时 PDF。
-- Codex 不读取、不打印、不分析原始 PDF 内容。
-- 真实输出默认写入 `local_outputs/run_时间戳/`，该目录已加入 `.gitignore`。
-- 交互完成后，Codex 只允许读取脱敏 CSV、`privacy_guard_report.json`、`merge_report.json`、`cleaned_trades.csv`、`metrics.json`、`trade_lifecycle.json`、`behavior_flags.json`、`counterfactual_report.json`、`trade_review_report.html`。
+## Playbook 规则
 
-## 推荐工作流
+- 单次交易成功不得直接进入 `可复制`。
+- 至少 3 次类似证据后，才能从 `待验证` 升级为 `可复制`。
+- 亏损或风险失控模式进入 `应避免`。
+- 每条 playbook 必须包含：触发条件、入场理由类型、退出方式、最大风险、证据日期、验证状态。
 
-### 方式一：浏览器隐私交互
+## 文章叙事污染检查
 
-1. 运行 `python3 scripts/interactive_runner.py --open`
-2. 在本地页面上传一个或多个 PDF。
-3. 等待隐私检查和复盘流程完成。
-4. 点击页面中的“打开 HTML 报告”。
+`article_digest.py` 不只总结文章，还必须判断：
 
-### 方式二：命令行流程
-
-1. PDF 本地脱敏：`python3 scripts/sanitize_pdf_statement.py 交割单.pdf -o sanitized_trades.csv`
-2. 隐私检查：`python3 scripts/privacy_guard.py sanitized_trades.csv`
-3. 标准化解析：`python3 scripts/parse_statement.py sanitized_trades.csv`
-4. 计算指标：`python3 scripts/compute_metrics.py cleaned_trades.csv`
-5. 构建生命周期：`python3 scripts/build_trade_lifecycle.py cleaned_trades.csv`
-6. 行为诊断：`python3 scripts/detect_behavior_patterns.py cleaned_trades.csv metrics.json trade_lifecycle.json`
-7. 反事实模拟：`python3 scripts/counterfactual_simulator.py metrics.json trade_lifecycle.json`
-8. 生成 Markdown：`python3 scripts/generate_review_report.py`
-9. 生成 HTML：`python3 scripts/generate_html_report.py`
+- 是否强化已有持仓偏见。
+- 是否诱发追涨。
+- 是否提供可验证事实。
+- 是否只是情绪安慰。
+- 是否影响当天交易动作。
 
 ## 输出文件
 
-- `sanitized_trades.csv`
-- `privacy_guard_report.json`
-- `merge_report.json`
 - `cleaned_trades.csv`
 - `metrics.json`
 - `trade_lifecycle.json`
 - `behavior_flags.json`
 - `counterfactual_report.json`
-- `trade_review_report.md`
-- `trade_review_report.html`
-- 交互模式默认输出目录：`local_outputs/run_时间戳/`
-- 交互模式会额外复制一份最新 HTML 报告到 `local_outputs/trade_review_report.html`，作为稳定入口。
+- `daily_journal.json`
+- `article_digest.json`
+- `pre_trade_guard.json`
+- `daily_coach_report.json`
+- `daily_coach_report.md`
+- `daily_coach_report.html`
+- `local_state/playbooks.json`
+
+真实输出默认写入 `local_outputs/run_时间戳/`；最新 HTML 报告复制到 `local_outputs/daily_coach_report.html`。
 
 ## 隐私边界
 
-- 默认本地处理数据，不上传服务器。
+- 默认本地处理交易文件，不上传服务器。
 - 不把原始 PDF 全文交给 AI 分析。
-- 交互模式的原始 PDF 只能保存在系统临时目录，并在脱敏后删除。
-- `sanitize_pdf_statement.py` 默认删除资金余额；只有用户传 `--keep-balance` 才保留。
-- `privacy_guard.py` 发现身份、账号、手机号、银行卡、客户号、股东账号等高危信息时必须失败；证券名称中的地名只给警告，表头或备注中的完整地址才阻断。
-- 公开仓库只能提交源码、文档和完全虚构样例，不提交真实 PDF、真实交割单、真实输出或真实账户信息。
+- 原始上传文件只保存在 `tempfile.TemporaryDirectory()`，处理后删除，不进入项目目录。
+- `local_outputs/` 与 `local_state/` 不提交 Git。
+- 公开仓库只能提交源码、文档和完全虚构样例，不提交真实 PDF、真实交割单、截图、真实 journal 或真实账户信息。
 
 ## 投资边界
 
 - 不荐股。
 - 不预测未来涨跌。
 - 不输出买入、卖出或持有某只股票的建议。
-- 所有结论必须基于用户上传的历史成交数据。
-
-## HTML 使用方式
-
-- 打开 `docs/index.html` 查看中文使用说明。
-- 打开 `tools/local-runner.html` 查看本地命令向导。
-- 默认运行 `scripts/interactive_runner.py --open` 使用隐私交互模式；静态查看可打开 `tools/privacy-upload.html`。
-- 运行 `scripts/generate_html_report.py` 后打开 `trade_review_report.html` 查看复盘报告。
-
-## 字段不匹配时
-
-读取 `references/broker_field_mapping.md`，展示已识别字段、未匹配字段和建议映射；不要凭空造字段。必要时请用户提供手动字段映射。
+- 所有结论必须基于用户提供的历史成交、当天想法和文章观点。
+- 数据不足时必须写 `无法判断`。
+- 稳定盈利定义为寻找可重复、可验证、风险可控的交易模式，而不是预测未来。
 
 ## 何时读取 references
 

@@ -1,6 +1,10 @@
 *.pdf
 *.xlsx
 *.xls
+*.png
+*.jpg
+*.jpeg
+*.webp
 *.csv
 *.json
 outputs/
@@ -8,6 +12,7 @@ reports/
 private/
 real-data/
 local_outputs/
+local_state/
 *.sanitized.*
 sanitize_pdf_report.json
 privacy_guard_report.json

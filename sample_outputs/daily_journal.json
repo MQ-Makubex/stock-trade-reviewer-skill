@@ -1,0 +1,11 @@
+{
+  "trade_date": "2026-06-30",
+  "trading_idea": "虚构样例：观察盈利票兑现和亏损票处理是否遵守计划",
+  "trade_intent": "复盘短线交易纪律，不作为买卖建议",
+  "mood": "平静",
+  "plan": "盈利按计划兑现，亏损超过纪律线必须复盘",
+  "review_note": "样例数据完全虚构",
+  "article_influenced": true,
+  "discipline_tags": [],
+  "privacy_note": "仅保存用户输入的交易想法摘要，不保存原始 PDF、截图或未脱敏交易文件。"
+}

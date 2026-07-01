@@ -1,0 +1,33 @@
+{
+  "source_url": "",
+  "title": "无法判断",
+  "viewpoints": [
+    "作者认为业绩数据和订单公告需要核验，但也提醒不要因为踏空情绪追涨",
+    "这是一篇完全虚构的市场观点文章",
+    "文章提到低估和耐心可能强化已有持仓偏见"
+  ],
+  "narrative_pollution_checks": {
+    "reinforces_position_bias": {
+      "flag": true,
+      "reason": "文章或 journal 可能强化已有持仓叙事。"
+    },
+    "induces_chasing": {
+      "flag": true,
+      "reason": "文章或 journal 可能诱发追涨冲动。"
+    },
+    "has_verifiable_facts": {
+      "flag": true,
+      "reason": "包含可核验事实线索，仍需人工核对来源。"
+    },
+    "is_emotional_comfort": {
+      "flag": true,
+      "reason": "文本可能主要提供情绪安慰。"
+    },
+    "affected_today_trade": {
+      "flag": true,
+      "reason": "文章观点可能影响了当天交易动作。"
+    }
+  },
+  "affected_trade_decision": true,
+  "storage_policy": "不保存文章全文，只保存标题、URL、观点摘要和叙事污染检查结果。"
+}

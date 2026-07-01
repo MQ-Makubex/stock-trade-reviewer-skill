@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "updated_at": "2026-06-30",
+  "playbooks": {
+    "可复制": [],
+    "待验证": [
+      {
+        "pattern_key": "盈利后按计划兑现|用户交易想法/成交结果复盘|计划内退出待验证|低",
+        "name": "盈利后按计划兑现：DEMOA 虚构科技",
+        "trigger_condition": "盈利后按计划兑现",
+        "entry_reason_type": "用户交易想法/成交结果复盘",
+        "exit_method": "计划内退出待验证",
+        "max_risk": "低",
+        "evidence_dates": [
+          "2026-06-30"
+        ],
+        "evidence_count": 1,
+        "validation_status": "待验证",
+        "notes": "由历史成交、当日想法和行为诊断生成；不构成买卖建议。"
+      }
+    ],
+    "应避免": [
+      {
+        "pattern_key": "亏损扩大、拖延退出或风险失控|用户交易想法/成交结果复盘|亏损退出|高",
+        "name": "亏损扩大、拖延退出或风险失控：DEMOB 虚构制造",
+        "trigger_condition": "亏损扩大、拖延退出或风险失控",
+        "entry_reason_type": "用户交易想法/成交结果复盘",
+        "exit_method": "亏损退出",
+        "max_risk": "高",
+        "evidence_dates": [
+          "2026-06-30"
+        ],
+        "evidence_count": 1,
+        "validation_status": "应避免",
+        "notes": "由历史成交、当日想法和行为诊断生成；不构成买卖建议。"
+      },
+      {
+        "pattern_key": "亏损扩大、拖延退出或风险失控|用户交易想法/成交结果复盘|亏损退出|中",
+        "name": "亏损扩大、拖延退出或风险失控：DEMOD 虚构长持",
+        "trigger_condition": "亏损扩大、拖延退出或风险失控",
+        "entry_reason_type": "用户交易想法/成交结果复盘",
+        "exit_method": "亏损退出",
+        "max_risk": "中",
+        "evidence_dates": [
+          "2026-06-30"
+        ],
+        "evidence_count": 1,
+        "validation_status": "应避免",
+        "notes": "由历史成交、当日想法和行为诊断生成；不构成买卖建议。"
+      },
+      {
+        "pattern_key": "小赚大亏|风险行为诊断|纪律复盘|高",
+        "name": "应避免：小赚大亏",
+        "trigger_condition": "小赚大亏",
+        "entry_reason_type": "风险行为诊断",
+        "exit_method": "纪律复盘",
+        "max_risk": "高",
+        "evidence_dates": [
+          "2026-06-30"
+        ],
+        "evidence_count": 1,
+        "validation_status": "应避免",
+        "notes": "亏损单的破坏力显著大于盈利单。"
+      },
+      {
+        "pattern_key": "单票亏损过大|风险行为诊断|纪律复盘|高",
+        "name": "应避免：单票亏损过大",
+        "trigger_condition": "单票亏损过大",
+        "entry_reason_type": "风险行为诊断",
+        "exit_method": "纪律复盘",
+        "max_risk": "高",
+        "evidence_dates": [
+          "2026-06-30"
+        ],
+        "evidence_count": 1,
+        "validation_status": "应避免",
+        "notes": "少数股票贡献了主要亏损，风险集中。"
+      },
+      {
+        "pattern_key": "手续费消耗过高|风险行为诊断|纪律复盘|中",
+        "name": "应避免：手续费消耗过高",
+        "trigger_condition": "手续费消耗过高",
+        "entry_reason_type": "风险行为诊断",
+        "exit_method": "纪律复盘",
+        "max_risk": "中",
+        "evidence_dates": [
+          "2026-06-30"
+        ],
+        "evidence_count": 1,
+        "validation_status": "应避免",
+        "notes": "费用对结果有明显侵蚀，尤其在高频或低胜率时会放大。"
+      },
+      {
+        "pattern_key": "盈利拿不住|风险行为诊断|纪律复盘|中",
+        "name": "应避免：盈利拿不住",
+        "trigger_condition": "盈利拿不住",
+        "entry_reason_type": "风险行为诊断",
+        "exit_method": "纪律复盘",
+        "max_risk": "中",
+        "evidence_dates": [
+          "2026-06-30"
+        ],
+        "evidence_count": 1,
+        "validation_status": "应避免",
+        "notes": "盈利交易持仓很短，需检查是否过早兑现。"
+      },
+      {
+        "pattern_key": "亏损持有过久|风险行为诊断|纪律复盘|高",
+        "name": "应避免：亏损持有过久",
+        "trigger_condition": "亏损持有过久",
+        "entry_reason_type": "风险行为诊断",
+        "exit_method": "纪律复盘",
+        "max_risk": "高",
+        "evidence_dates": [
+          "2026-06-30"
+        ],
+        "evidence_count": 1,
+        "validation_status": "应避免",
+        "notes": "亏损交易持有较久，需检查止损与复盘纪律。"
+      },
+      {
+        "pattern_key": "疑似情绪交易|风险行为诊断|纪律复盘|中",
+        "name": "应避免：疑似情绪交易",
+        "trigger_condition": "疑似情绪交易",
+        "entry_reason_type": "风险行为诊断",
+        "exit_method": "纪律复盘",
+        "max_risk": "中",
+        "evidence_dates": [
+          "2026-06-30"
+        ],
+        "evidence_count": 1,
+        "validation_status": "应避免",
+        "notes": "存在短时间集中交易或同日反向交易，疑似情绪交易。"
+      },
+      {
+        "pattern_key": "疑似追高|风险行为诊断|纪律复盘|中",
+        "name": "应避免：疑似追高",
+        "trigger_condition": "疑似追高",
+        "entry_reason_type": "风险行为诊断",
+        "exit_method": "纪律复盘",
+        "max_risk": "中",
+        "evidence_dates": [
+          "2026-06-30"
+        ],
+        "evidence_count": 1,
+        "validation_status": "应避免",
+        "notes": "成交记录显示疑似卖飞后更高价追回。"
+      },
+      {
+        "pattern_key": "疑似补仓摊薄幻觉|风险行为诊断|纪律复盘|中",
+        "name": "应避免：疑似补仓摊薄幻觉",
+        "trigger_condition": "疑似补仓摊薄幻觉",
+        "entry_reason_type": "风险行为诊断",
+        "exit_method": "纪律复盘",
+        "max_risk": "中",
+        "evidence_dates": [
+          "2026-06-30"
+        ],
+        "evidence_count": 1,
+        "validation_status": "应避免",
+        "notes": "存在越跌越买且结果未改善的迹象，疑似补仓摊薄幻觉。"
+      }
+    ]
+  }
+}

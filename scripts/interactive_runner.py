@@ -4,6 +4,7 @@ import csv
 import json
 import mimetypes
 import posixpath
+import re
 import shutil
 import subprocess
 import sys
@@ -23,6 +24,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
 TOOLS_DIR = PROJECT_DIR / "tools"
 DEFAULT_OUTPUT_DIR = PROJECT_DIR / "local_outputs"
+DEFAULT_STATE_DIR = PROJECT_DIR / "local_state"
 BUNDLED_PYTHON = Path.home() / ".cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3"
 
 ALLOWED_CODEX_READ_FILES = [
@@ -37,6 +39,13 @@ ALLOWED_CODEX_READ_FILES = [
     "counterfactual_report.json",
     "merge_report.json",
     "trade_review_report.html",
+    "daily_journal.json",
+    "article_digest.json",
+    "daily_coach_report.json",
+    "daily_coach_report.md",
+    "daily_coach_report.html",
+    "playbooks.json",
+    "pre_trade_guard.json",
 ]
 
 SANITIZED_FIELDS = [
@@ -53,6 +62,26 @@ SANITIZED_FIELDS = [
 ]
 
 DEDUPE_KEY = ["trade_date", "side", "stock_code", "stock_name", "quantity", "price", "net_amount"]
+
+CLEANED_FIELDS = [
+    "trade_date",
+    "security_code",
+    "security_name",
+    "side",
+    "price",
+    "quantity",
+    "trade_amount",
+    "commission",
+    "stamp_tax",
+    "transfer_fee",
+    "other_fee",
+    "total_fee",
+    "cash_amount",
+    "cash_balance",
+    "source_row",
+]
+
+CLEANED_DEDUPE_KEY = ["trade_date", "side", "security_code", "security_name", "quantity", "price", "cash_amount"]
 
 
 class ProcessingError(Exception):
@@ -163,6 +192,58 @@ def parse_multipart_pdfs(body, content_type):
     if not uploads:
         raise ProcessingError("未找到 PDF", ["表单中没有名为 pdf 的文件字段。"])
     return uploads
+
+
+def parse_content_disposition(headers):
+    match = re.search(r'filename="([^"]*)"', headers)
+    filename = match.group(1) if match else ""
+    name_match = re.search(r'name="([^"]*)"', headers)
+    field_name = name_match.group(1) if name_match else ""
+    return field_name, filename
+
+
+def classify_upload(filename, payload):
+    suffix = Path(filename or "").suffix.lower()
+    if payload.startswith(b"%PDF") or suffix == ".pdf":
+        return "pdf", ".pdf"
+    if payload.startswith(b"PK") or suffix in {".xlsx", ".xlsm"}:
+        return "xlsx", ".xlsx"
+    if suffix == ".csv" or b"," in payload[:2048] or b"\t" in payload[:2048]:
+        return "csv", ".csv"
+    return "unknown", suffix or ".bin"
+
+
+def parse_multipart_form(body, content_type):
+    marker = "boundary="
+    if marker not in content_type:
+        raise ProcessingError("上传格式错误", ["请求不是 multipart/form-data。"])
+    boundary = content_type.split(marker, 1)[1].split(";", 1)[0].strip().strip('"')
+    if not boundary:
+        raise ProcessingError("上传格式错误", ["缺少 multipart boundary。"])
+
+    fields = {}
+    files = []
+    delimiter = ("--" + boundary).encode("utf-8")
+    for part in body.split(delimiter):
+        part = part.strip()
+        if not part or part == b"--":
+            continue
+        if part.endswith(b"--"):
+            part = part[:-2].strip()
+        header_blob, sep, payload = part.partition(b"\r\n\r\n")
+        if not sep:
+            continue
+        headers = header_blob.decode("utf-8", errors="replace")
+        field_name, filename = parse_content_disposition(headers)
+        if payload.endswith(b"\r\n"):
+            payload = payload[:-2]
+        if filename:
+            file_id = f"file_{len(files) + 1:03d}"
+            kind, suffix = classify_upload(filename, payload)
+            files.append({"file_id": file_id, "kind": kind, "suffix": suffix, "content": payload})
+        elif field_name:
+            fields[field_name] = payload.decode("utf-8", errors="replace")
+    return fields, files
 
 
 def load_privacy_summary(path):
@@ -365,6 +446,213 @@ def process_pdfs(uploads, output_dir):
     }
 
 
+def write_cleaned_rows(path, rows):
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=CLEANED_FIELDS, extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in CLEANED_FIELDS})
+
+
+def merge_cleaned_files(files, merged_path):
+    rows = []
+    for item in files:
+        if item.get("status") == "ok":
+            rows.extend(read_csv_rows(item["cleaned_path"]))
+    seen = set()
+    deduped = []
+    for row in rows:
+        key = tuple((row.get(field, "") or "").strip() for field in CLEANED_DEDUPE_KEY)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(row)
+    write_cleaned_rows(merged_path, deduped)
+    return rows, deduped
+
+
+def parse_uploaded_file(upload, tmpdir, run_dir):
+    file_id = upload["file_id"]
+    kind = upload.get("kind")
+    if not upload.get("content"):
+        return {"file_id": file_id, "status": "failed", "reason": "上传文件为空。"}
+    if kind not in {"pdf", "csv", "xlsx"}:
+        return {"file_id": file_id, "status": "failed", "reason": "仅支持 PDF、CSV、XLSX。"}
+
+    tmp_path = Path(tmpdir) / f"{file_id}{upload.get('suffix') or '.bin'}"
+    tmp_path.write_bytes(upload["content"])
+    if not is_relative_to(tmp_path, tempfile.gettempdir()):
+        raise ProcessingError("临时目录异常", ["上传文件未写入系统临时目录，已停止处理。"], status_code=500)
+
+    try:
+        if kind == "pdf":
+            pdf_result = process_one_pdf({"file_id": file_id, "content": upload["content"]}, tmpdir, run_dir)
+            if pdf_result.get("status") != "ok":
+                return pdf_result
+            source_for_parse = pdf_result["sanitized_path"]
+            privacy_status = pdf_result.get("privacy_status", "通过")
+            privacy_messages = pdf_result.get("messages", [])
+        else:
+            source_for_parse = str(tmp_path)
+            privacy_report = run_dir / f"{file_id}_privacy_guard_report.json"
+            if kind == "csv":
+                try:
+                    run_command([PYTHON, str(SCRIPT_DIR / "privacy_guard.py"), str(tmp_path), "-o", str(privacy_report)])
+                except subprocess.CalledProcessError:
+                    privacy_status, privacy_messages = load_privacy_summary(privacy_report)
+                    return {
+                        "file_id": file_id,
+                        "status": "failed",
+                        "reason": "CSV 隐私检查失败。",
+                        "privacy_status": privacy_status,
+                        "messages": privacy_messages,
+                    }
+                privacy_status, privacy_messages = load_privacy_summary(privacy_report)
+            else:
+                privacy_status, privacy_messages = "通过", ["XLSX 在本机临时目录解析；解析后的标准 CSV 会继续做隐私检查。"]
+
+        cleaned = run_dir / f"{file_id}_cleaned.csv"
+        mapping = run_dir / f"{file_id}_field_mapping_suggestions.json"
+        run_command([PYTHON, str(SCRIPT_DIR / "parse_statement.py"), str(source_for_parse), "-o", str(cleaned), "--suggestions-out", str(mapping)])
+        cleaned_privacy = run_dir / f"{file_id}_cleaned_privacy_guard_report.json"
+        run_command([PYTHON, str(SCRIPT_DIR / "privacy_guard.py"), str(cleaned), "-o", str(cleaned_privacy)])
+        return {
+            "file_id": file_id,
+            "status": "ok",
+            "kind": kind,
+            "cleaned_path": str(cleaned),
+            "privacy_status": privacy_status,
+            "messages": privacy_messages,
+        }
+    except subprocess.CalledProcessError:
+        return {"file_id": file_id, "status": "failed", "kind": kind, "reason": "本地解析或隐私检查失败。"}
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
+def build_journal_input(fields):
+    tags = [tag.strip() for tag in fields.get("discipline_tags", "").split(",") if tag.strip()]
+    return {
+        "trade_date": fields.get("trade_date", ""),
+        "trading_idea": fields.get("trading_idea", ""),
+        "trade_intent": fields.get("trade_intent", ""),
+        "mood": fields.get("mood", ""),
+        "plan": fields.get("plan", ""),
+        "review_note": fields.get("review_note", ""),
+        "article_influenced": fields.get("article_influenced", "").lower() in {"1", "true", "on", "yes", "是"},
+        "discipline_tags": tags,
+    }
+
+
+def process_coach_request(fields, uploads, output_dir, state_dir):
+    if not uploads:
+        raise ProcessingError("未找到交易文件", ["请上传至少一个 PDF、CSV 或 XLSX。"])
+
+    base_output_dir = safe_output_dir(output_dir)
+    state_dir = safe_output_dir(state_dir)
+    run_name, run_dir = make_run_dir(base_output_dir)
+    messages = [f"收到 {len(uploads)} 个交易文件，使用内部编号 file_001 起处理。"]
+
+    with tempfile.TemporaryDirectory(prefix="stock_coach_") as tmpdir:
+        file_results = [parse_uploaded_file(upload, tmpdir, run_dir) for upload in uploads]
+        article_text = fields.get("article_text", "")
+        article_text_path = Path(tmpdir) / "article_text.txt"
+        if article_text:
+            article_text_path.write_text(article_text, encoding="utf-8")
+
+        success_count = sum(1 for item in file_results if item.get("status") == "ok")
+        if success_count == 0:
+            raise ProcessingError("全部文件处理失败", ["所有上传文件均未通过本地解析或隐私检查。"])
+
+        cleaned = run_dir / "cleaned_trades.csv"
+        all_rows, deduped_rows = merge_cleaned_files(file_results, cleaned)
+        merge_report = {
+            "uploaded_files": len(uploads),
+            "success_count": success_count,
+            "failure_count": len(uploads) - success_count,
+            "rows_before_dedupe": len(all_rows),
+            "rows_after_dedupe": len(deduped_rows),
+            "duplicate_rows_removed": len(all_rows) - len(deduped_rows),
+            "file_results": [{k: v for k, v in item.items() if k not in {"cleaned_path"}} for item in file_results],
+            "note": "不记录原始文件名；每个文件仅使用内部编号。",
+        }
+        merge_report_path = run_dir / "merge_report.json"
+        merge_report_path.write_text(json.dumps(merge_report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        metrics = run_dir / "metrics.json"
+        lifecycle = run_dir / "trade_lifecycle.json"
+        behavior = run_dir / "behavior_flags.json"
+        counterfactual = run_dir / "counterfactual_report.json"
+        journal_input = run_dir / "daily_journal_input.json"
+        journal = run_dir / "daily_journal.json"
+        article = run_dir / "article_digest.json"
+        playbooks = state_dir / "playbooks.json"
+        playbooks_snapshot = run_dir / "playbooks.json"
+        guard = run_dir / "pre_trade_guard.json"
+        coach_json = run_dir / "daily_coach_report.json"
+        coach_md = run_dir / "daily_coach_report.md"
+        coach_html = run_dir / "daily_coach_report.html"
+        stable_coach_html = base_output_dir / "daily_coach_report.html"
+
+        journal_input.write_text(json.dumps(build_journal_input(fields), ensure_ascii=False, indent=2), encoding="utf-8")
+        article_args = [PYTHON, str(SCRIPT_DIR / "article_digest.py"), "--journal-json", str(journal), "-o", str(article)]
+        if fields.get("article_url"):
+            article_args.extend(["--url", fields.get("article_url", "")])
+        elif article_text:
+            article_args.extend(["--text-file", str(article_text_path)])
+        else:
+            article_args.extend(["--text", ""])
+
+        steps = [
+            [PYTHON, str(SCRIPT_DIR / "compute_metrics.py"), str(cleaned), "-o", str(metrics)],
+            [PYTHON, str(SCRIPT_DIR / "build_trade_lifecycle.py"), str(cleaned), "-o", str(lifecycle)],
+            [PYTHON, str(SCRIPT_DIR / "detect_behavior_patterns.py"), str(cleaned), str(metrics), str(lifecycle), "-o", str(behavior)],
+            [PYTHON, str(SCRIPT_DIR / "counterfactual_simulator.py"), str(metrics), str(lifecycle), "-o", str(counterfactual)],
+            [PYTHON, str(SCRIPT_DIR / "daily_journal.py"), "--input-json", str(journal_input), "-o", str(journal)],
+            article_args,
+            [PYTHON, str(SCRIPT_DIR / "playbook_manager.py"), "--metrics", str(metrics), "--lifecycle", str(lifecycle), "--behavior", str(behavior), "--journal", str(journal), "--state", str(playbooks)],
+            [PYTHON, str(SCRIPT_DIR / "pre_trade_guard.py"), "--playbooks", str(playbooks), "--behavior", str(behavior), "-o", str(guard)],
+            [PYTHON, str(SCRIPT_DIR / "generate_coach_report.py"), "--metrics", str(metrics), "--lifecycle", str(lifecycle), "--behavior", str(behavior), "--journal", str(journal), "--article", str(article), "--playbooks", str(playbooks), "--guard", str(guard), "--json-output", str(coach_json), "--markdown-output", str(coach_md), "--html-output", str(coach_html)],
+        ]
+        try:
+            for step in steps:
+                run_command(step)
+        except subprocess.CalledProcessError:
+            raise ProcessingError("每日教练流程失败", ["交易文件已本地解析，但 journal、文章摘要或教练报告生成失败。"], status_code=500)
+
+        if playbooks.exists():
+            shutil.copy2(playbooks, playbooks_snapshot)
+        shutil.copy2(coach_html, stable_coach_html)
+
+    messages.append(f"上传文件数：{len(uploads)}，成功：{success_count}，失败：{len(uploads) - success_count}。")
+    messages.append(f"去重前行数：{len(all_rows)}，去重后行数：{len(deduped_rows)}，删除重复行：{len(all_rows) - len(deduped_rows)}。")
+    messages.append("PDF、CSV、XLSX 均只在本机处理；原始上传文件已从系统临时目录删除。")
+    messages.append("每日教练报告不荐股、不预测涨跌、不输出买卖建议。")
+
+    report_url = f"/local_outputs/{run_name}/daily_coach_report.html"
+    return {
+        "status": "ok",
+        "title": "每日教练报告已生成",
+        "privacy_status": "通过",
+        "messages": messages,
+        "paths": {
+            "cleaned_trades": str(cleaned),
+            "merge_report": str(merge_report_path),
+            "daily_journal": str(journal),
+            "article_digest": str(article),
+            "playbooks": str(playbooks),
+            "pre_trade_guard": str(guard),
+            "html_report": str(coach_html),
+            "stable_html_report": str(stable_coach_html),
+            "html_report_relative": str(Path("local_outputs") / run_name / "daily_coach_report.html"),
+        },
+        "report_url": report_url,
+        "stable_report_url": "/local_outputs/daily_coach_report.html",
+        "allowed_codex_read_files": ALLOWED_CODEX_READ_FILES,
+    }
+
+
 class PrivacyUploadHandler(BaseHTTPRequestHandler):
     server_version = "StockTradePrivacyRunner/1.0"
 
@@ -399,6 +687,9 @@ class PrivacyUploadHandler(BaseHTTPRequestHandler):
         if path == "/local_outputs/trade_review_report.html":
             self.send_file(self.server.output_dir / "trade_review_report.html", "text/html; charset=utf-8")
             return
+        if path == "/local_outputs/daily_coach_report.html":
+            self.send_file(self.server.output_dir / "daily_coach_report.html", "text/html; charset=utf-8")
+            return
         if path.startswith("/local_outputs/"):
             parts = [part for part in posixpath.normpath(path).split("/") if part]
             if len(parts) != 3 or parts[0] != "local_outputs":
@@ -427,8 +718,8 @@ class PrivacyUploadHandler(BaseHTTPRequestHandler):
                 raise ProcessingError("文件大小不合法", ["PDF 为空或超过大小限制。"])
             content_type = self.headers.get("Content-Type", "")
             body = self.rfile.read(length)
-            uploads = parse_multipart_pdfs(body, content_type)
-            result = process_pdfs(uploads, self.server.output_dir)
+            fields, uploads = parse_multipart_form(body, content_type)
+            result = process_coach_request(fields, uploads, self.server.output_dir, self.server.state_dir)
             report_http_url = f"http://{HOST}:{self.server.server_port}{result['report_url']}"
             stable_http_url = f"http://{HOST}:{self.server.server_port}{result['stable_report_url']}"
             html_report_path = result.get("paths", {}).get("html_report", "")
@@ -460,9 +751,10 @@ class PrivacyUploadHandler(BaseHTTPRequestHandler):
 
 
 class PrivacyRunnerServer(ThreadingHTTPServer):
-    def __init__(self, server_address, handler_cls, output_dir, max_upload_bytes):
+    def __init__(self, server_address, handler_cls, output_dir, state_dir, max_upload_bytes):
         super().__init__(server_address, handler_cls)
         self.output_dir = safe_output_dir(output_dir)
+        self.state_dir = safe_output_dir(state_dir)
         self.max_upload_bytes = max_upload_bytes
 
 
@@ -471,13 +763,14 @@ def main():
     parser.add_argument("--open", action="store_true", help="启动后自动打开浏览器")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
+    parser.add_argument("--state-dir", default=str(DEFAULT_STATE_DIR))
     parser.add_argument("--max-mb", type=int, default=50)
     args = parser.parse_args()
 
-    server = PrivacyRunnerServer((HOST, args.port), PrivacyUploadHandler, Path(args.output_dir), args.max_mb * 1024 * 1024)
+    server = PrivacyRunnerServer((HOST, args.port), PrivacyUploadHandler, Path(args.output_dir), Path(args.state_dir), args.max_mb * 1024 * 1024)
     url = f"http://{HOST}:{args.port}"
-    print(f"本地隐私交互页面已启动：{url}")
-    print("仅监听 127.0.0.1；真实 PDF 只在本机临时目录处理。按 Ctrl+C 退出。")
+    print(f"本地股票教练页面已启动：{url}")
+    print("仅监听 127.0.0.1；真实交易文件只在本机临时目录处理。按 Ctrl+C 退出。")
     print(f"子脚本解释器：{PYTHON}")
     if args.open:
         webbrowser.open(url)
